@@ -1,9 +1,10 @@
 using LibVLCSharp.Shared;
+using StreamPlayer.Models;
 
 namespace StreamPlayer.Services.Interfaces;
 
 public interface IPlayerService
 {
     MediaPlayer MediaPlayer { get; }
-    Task PlayAsync(string url);
+    Task<VideoInfo> PlayAsync(string url);
 }
