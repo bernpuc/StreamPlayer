@@ -1,6 +1,7 @@
 using StreamPlayer.Models;
 using StreamPlayer.ViewModels;
 using System.Windows;
+using System.Windows.Controls;
 using System.Windows.Controls.Primitives;
 using System.Windows.Media;
 using System.Windows.Media.Imaging;
@@ -17,6 +18,17 @@ public partial class MainWindow : Window
         Loaded += (_, _) =>
         {
             VideoPlayer.MediaPlayer = viewModel.MediaPlayer;
+
+            UrlBox.MouseEnter += (_, _) => { UrlBox.Focus(); UrlBox.SelectAll(); };
+
+            HistoryList.SelectionChanged += (_, _) =>
+            {
+                if (HistoryList.SelectedItem is HistoryEntry entry)
+                {
+                    viewModel.SelectHistoryEntry(entry);
+                    HistoryList.SelectedItem = null;
+                }
+            };
 
             SeekSlider.AddHandler(Thumb.DragStartedEvent,
                 new DragStartedEventHandler((_, _) => viewModel.OnSeekStarted()));

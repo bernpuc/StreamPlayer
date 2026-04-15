@@ -32,6 +32,35 @@
             </Style.Triggers>
         </Style>
 
+        <Style x:Key="HistoryButtonStyle" TargetType="Button">
+            <Setter Property="Foreground" Value="#CCCCCC"/>
+            <Setter Property="Background" Value="#2A2A2A"/>
+            <Setter Property="BorderBrush" Value="#555"/>
+            <Setter Property="BorderThickness" Value="1"/>
+            <Setter Property="FontSize" Value="12"/>
+            <Setter Property="Height" Value="34"/>
+            <Setter Property="Padding" Value="12,0"/>
+            <Setter Property="Cursor" Value="Hand"/>
+            <Setter Property="Template">
+                <Setter.Value>
+                    <ControlTemplate TargetType="Button">
+                        <Border Background="{TemplateBinding Background}"
+                                BorderBrush="{TemplateBinding BorderBrush}"
+                                BorderThickness="{TemplateBinding BorderThickness}"
+                                CornerRadius="3" Padding="{TemplateBinding Padding}">
+                            <ContentPresenter HorizontalAlignment="Center" VerticalAlignment="Center"/>
+                        </Border>
+                    </ControlTemplate>
+                </Setter.Value>
+            </Setter>
+            <Style.Triggers>
+                <Trigger Property="IsMouseOver" Value="True">
+                    <Setter Property="Background" Value="#3D3D3D"/>
+                    <Setter Property="BorderBrush" Value="#777"/>
+                </Trigger>
+            </Style.Triggers>
+        </Style>
+
         <Style x:Key="PlayButton" TargetType="Button">
             <Setter Property="Foreground" Value="White"/>
             <Setter Property="Background" Value="#CC0000"/>
@@ -72,27 +101,110 @@
         <!-- ═══ Row 0: URL bar ═══ -->
         <Border Grid.Row="0" Background="#1E1E1E" Padding="12,10">
             <StackPanel>
-                <StackPanel Orientation="Horizontal">
-                    <TextBox x:Name="UrlBox"
-                             Text="{Binding Url, UpdateSourceTrigger=PropertyChanged}"
-                             Width="560" Height="34"
-                             VerticalContentAlignment="Center"
-                             Padding="8,0" FontSize="13"
-                             Background="#2D2D2D" Foreground="White"
-                             CaretBrush="White" BorderBrush="#555" BorderThickness="1">
-                        <TextBox.Resources>
-                            <Style TargetType="Border">
-                                <Setter Property="CornerRadius" Value="3"/>
-                            </Style>
-                        </TextBox.Resources>
-                    </TextBox>
-                    <Button Content="▶  Play" Command="{Binding PlayCommand}"
-                            Margin="10,0,0,0" Style="{StaticResource PlayButton}"/>
-                </StackPanel>
-                <TextBlock Text="{Binding ValidationMessage}" Foreground="#FF6B6B"
-                           FontSize="11" Margin="2,5,0,0">
-                    <TextBlock.Style>
-                        <Style TargetType="TextBlock">
+                <DockPanel LastChildFill="False">
+                    <!-- Left: URL input + Load button -->
+                    <StackPanel DockPanel.Dock="Left" Orientation="Horizontal">
+                        <TextBox x:Name="UrlBox"
+                                 Text="{Binding Url, UpdateSourceTrigger=PropertyChanged}"
+                                 Width="560" Height="34"
+                                 VerticalContentAlignment="Center"
+                                 Padding="8,0" FontSize="13"
+                                 Background="#2D2D2D" Foreground="White"
+                                 CaretBrush="White" BorderBrush="#555" BorderThickness="1">
+                            <TextBox.Resources>
+                                <Style TargetType="Border">
+                                    <Setter Property="CornerRadius" Value="3"/>
+                                </Style>
+                            </TextBox.Resources>
+                        </TextBox>
+                        <Button Content="▶  Load" Command="{Binding PlayCommand}"
+                                Margin="10,0,0,0" Style="{StaticResource PlayButton}"/>
+                    </StackPanel>
+                    <!-- Right: History button + dropdown Popup -->
+                    <Grid DockPanel.Dock="Right">
+                        <Button x:Name="HistoryButton"
+                                Content="History ▾"
+                                Command="{Binding ToggleHistoryCommand}"
+                                Style="{StaticResource HistoryButtonStyle}"
+                                VerticalAlignment="Center"/>
+                        <Popup x:Name="HistoryPopup"
+                               IsOpen="{Binding IsHistoryOpen, Mode=TwoWay}"
+                               PlacementTarget="{Binding ElementName=HistoryButton}"
+                               Placement="Bottom"
+                               StaysOpen="False"
+                               AllowsTransparency="True">
+                            <Border Background="#252525" BorderBrush="#555" BorderThickness="1"
+                                    MinWidth="400" MaxHeight="320">
+                                <StackPanel>
+                                    <Border BorderBrush="#3A3A3A" BorderThickness="0,0,0,1" Padding="10,6">
+                                        <TextBlock Text="Recent videos" Foreground="#777" FontSize="11"/>
+                                    </Border>
+                                    <!-- Empty state -->
+                                    <TextBlock Text="No history yet." Foreground="#666" FontSize="12"
+                                               Padding="10,8">
+                                        <TextBlock.Style>
+                                            <Style TargetType="TextBlock">
+                                                <Setter Property="Visibility" Value="Collapsed"/>
+                                                <Style.Triggers>
+                                                    <DataTrigger Binding="{Binding HasHistory}" Value="False">
+                                                        <Setter Property="Visibility" Value="Visible"/>
+                                                    </DataTrigger>
+                                                </Style.Triggers>
+                                            </Style>
+                                        </TextBlock.Style>
+                                    </TextBlock>
+                                    <!-- History list -->
+                                    <ScrollViewer VerticalScrollBarVisibility="Auto"
+                                                  Visibility="{Binding HasHistory, Converter={StaticResource BoolToVis}}">
+                                        <ListBox x:Name="HistoryList"
+                                                 ItemsSource="{Binding HistoryEntries}"
+                                                 Background="Transparent"
+                                                 BorderThickness="0"
+                                                 Focusable="False">
+                                            <ListBox.ItemTemplate>
+                                                <DataTemplate>
+                                                    <TextBlock Text="{Binding Title}"
+                                                               Foreground="White" FontSize="12"
+                                                               TextTrimming="CharacterEllipsis"/>
+                                                </DataTemplate>
+                                            </ListBox.ItemTemplate>
+                                            <ListBox.ItemContainerStyle>
+                                                <Style TargetType="ListBoxItem">
+                                                    <Setter Property="Padding" Value="10,7"/>
+                                                    <Setter Property="Cursor" Value="Hand"/>
+                                                    <Setter Property="HorizontalContentAlignment" Value="Stretch"/>
+                                                    <Setter Property="Template">
+                                                        <Setter.Value>
+                                                            <ControlTemplate TargetType="ListBoxItem">
+                                                                <Border x:Name="Bd"
+                                                                        Background="Transparent"
+                                                                        Padding="{TemplateBinding Padding}">
+                                                                    <ContentPresenter/>
+                                                                </Border>
+                                                                <ControlTemplate.Triggers>
+                                                                    <Trigger Property="IsMouseOver" Value="True">
+                                                                        <Setter TargetName="Bd" Property="Background" Value="#3A3A3A"/>
+                                                                    </Trigger>
+                                                                </ControlTemplate.Triggers>
+                                                            </ControlTemplate>
+                                                        </Setter.Value>
+                                                    </Setter>
+                                                </Style>
+                                            </ListBox.ItemContainerStyle>
+                                        </ListBox>
+                                    </ScrollViewer>
+                                </StackPanel>
+                            </Border>
+                        </Popup>
+                    </Grid>
+                </DockPanel>
+                <TextBox Text="{Binding ValidationMessage, Mode=OneWay}"
+                         Foreground="#FF6B6B" Background="Transparent" BorderThickness="0"
+                         FontSize="11" Margin="2,5,0,0" Padding="0"
+                         IsReadOnly="True" IsTabStop="False"
+                         TextWrapping="Wrap" Cursor="IBeam">
+                    <TextBox.Style>
+                        <Style TargetType="TextBox">
                             <Setter Property="Visibility" Value="Visible"/>
                             <Style.Triggers>
                                 <DataTrigger Binding="{Binding ValidationMessage}" Value="">
@@ -100,12 +212,15 @@
                                 </DataTrigger>
                             </Style.Triggers>
                         </Style>
-                    </TextBlock.Style>
-                </TextBlock>
-                <TextBlock Text="{Binding StatusMessage}" Foreground="#AAAAAA"
-                           FontSize="11" Margin="2,5,0,0">
-                    <TextBlock.Style>
-                        <Style TargetType="TextBlock">
+                    </TextBox.Style>
+                </TextBox>
+                <TextBox Text="{Binding StatusMessage, Mode=OneWay}"
+                         Foreground="#AAAAAA" Background="Transparent" BorderThickness="0"
+                         FontSize="11" Margin="2,5,0,0" Padding="0"
+                         IsReadOnly="True" IsTabStop="False"
+                         TextWrapping="Wrap" Cursor="IBeam">
+                    <TextBox.Style>
+                        <Style TargetType="TextBox">
                             <Setter Property="Visibility" Value="Visible"/>
                             <Style.Triggers>
                                 <DataTrigger Binding="{Binding StatusMessage}" Value="">
@@ -113,8 +228,8 @@
                                 </DataTrigger>
                             </Style.Triggers>
                         </Style>
-                    </TextBlock.Style>
-                </TextBlock>
+                    </TextBox.Style>
+                </TextBox>
             </StackPanel>
         </Border>
 
@@ -123,7 +238,23 @@
 
         <!-- ═══ Row 2: Info bar (hidden until metadata arrives) ═══ -->
         <Border Grid.Row="2" Background="#181818" Padding="10,8"
-                Visibility="{Binding HasMetadata, Converter={StaticResource BoolToVis}}">
+                Visibility="{Binding HasMetadata, Converter={StaticResource BoolToVis}}"
+                ToolTip="Right-click to look up artist or track">
+            <Border.ContextMenu>
+                <ContextMenu Background="#252525" BorderBrush="#555" BorderThickness="1">
+                    <ContextMenu.Resources>
+                        <Style TargetType="MenuItem">
+                            <Setter Property="Foreground" Value="White"/>
+                        </Style>
+                    </ContextMenu.Resources>
+                    <MenuItem Header="Look up on Last.fm"
+                              Command="{Binding OpenLastFmCommand}"/>
+                    <MenuItem Header="Search lyrics on Genius"
+                              Command="{Binding OpenGeniusCommand}"/>
+                    <MenuItem Header="Artist on Wikipedia"
+                              Command="{Binding OpenWikipediaCommand}"/>
+                </ContextMenu>
+            </Border.ContextMenu>
             <Grid>
                 <Grid.ColumnDefinitions>
                     <ColumnDefinition Width="Auto"/>  <!-- thumbnail   -->
@@ -166,6 +297,8 @@
                     <ColumnDefinition Width="*"/>     <!-- seek slider   -->
                     <ColumnDefinition Width="Auto"/>  <!-- chapter name  -->
                     <ColumnDefinition Width="Auto"/>  <!-- time display  -->
+                    <ColumnDefinition Width="Auto"/>  <!-- volume        -->
+                    <ColumnDefinition Width="Auto"/>  <!-- identify      -->
                 </Grid.ColumnDefinitions>
 
                 <!-- Transport buttons -->
@@ -217,7 +350,8 @@
                            Foreground="#777" FontSize="11"
                            VerticalAlignment="Center"
                            MaxWidth="220" TextTrimming="CharacterEllipsis"
-                           Margin="6,0">
+                           Margin="6,0"
+                           ToolTip="Right-click to look up artist or song">
                     <TextBlock.Style>
                         <Style TargetType="TextBlock">
                             <Setter Property="Visibility" Value="Visible"/>
@@ -228,6 +362,27 @@
                             </Style.Triggers>
                         </Style>
                     </TextBlock.Style>
+                    <TextBlock.ContextMenu>
+                        <ContextMenu Background="#252525" BorderBrush="#555" BorderThickness="1">
+                            <ContextMenu.Resources>
+                                <Style TargetType="MenuItem">
+                                    <Setter Property="Foreground" Value="White"/>
+                                </Style>
+                            </ContextMenu.Resources>
+                            <!-- Artist lookups (visible only when artist was parsed) -->
+                            <MenuItem Command="{Binding OpenChapterArtistLastFmCommand}"
+                                      Header="{Binding ChapterArtist, StringFormat='Last.fm — {0}'}"
+                                      Visibility="{Binding HasChapterArtist, Converter={StaticResource BoolToVis}}"/>
+                            <MenuItem Command="{Binding OpenChapterArtistWikipediaCommand}"
+                                      Header="{Binding ChapterArtist, StringFormat='Wikipedia — {0}'}"
+                                      Visibility="{Binding HasChapterArtist, Converter={StaticResource BoolToVis}}"/>
+                            <Separator Visibility="{Binding HasChapterArtist, Converter={StaticResource BoolToVis}}"/>
+                            <!-- Song lookup (visible when song was parsed) -->
+                            <MenuItem Command="{Binding OpenChapterSongGeniusCommand}"
+                                      Header="{Binding ChapterSong, StringFormat='Genius — {0}'}"
+                                      Visibility="{Binding HasChapterSong, Converter={StaticResource BoolToVis}}"/>
+                        </ContextMenu>
+                    </TextBlock.ContextMenu>
                 </TextBlock>
 
                 <!-- Time display -->
@@ -237,6 +392,192 @@
                            VerticalAlignment="Center"
                            Margin="4,0,0,0"
                            FontFamily="Consolas"/>
+
+                <!-- Volume button + popup -->
+                <Grid Grid.Column="4" Margin="4,0,0,0" VerticalAlignment="Center">
+                    <Button x:Name="VolumeButton"
+                            Content="{Binding VolumeIcon}"
+                            Command="{Binding ToggleVolumeCommand}"
+                            Style="{StaticResource TransportButton}"
+                            ToolTip="Volume"
+                            FontSize="18"/>
+                    <Popup IsOpen="{Binding IsVolumeOpen, Mode=TwoWay}"
+                           PlacementTarget="{Binding ElementName=VolumeButton}"
+                           Placement="Top"
+                           StaysOpen="False"
+                           AllowsTransparency="True">
+                        <Border Background="#252525" BorderBrush="#555" BorderThickness="1"
+                                Width="52" Padding="0,8">
+                            <StackPanel HorizontalAlignment="Center">
+                                <!-- Volume % label -->
+                                <TextBlock Text="{Binding Volume, StringFormat={}{0}%}"
+                                           Foreground="#AAAAAA" FontSize="10" FontFamily="Consolas"
+                                           HorizontalAlignment="Center" Margin="0,0,0,6"/>
+                                <!-- Vertical slider: up = louder -->
+                                <Slider Orientation="Vertical"
+                                        Value="{Binding Volume, Mode=TwoWay}"
+                                        Minimum="0" Maximum="100"
+                                        Height="120"
+                                        HorizontalAlignment="Center">
+                                    <Slider.Style>
+                                        <Style TargetType="Slider">
+                                            <Style.Triggers>
+                                                <DataTrigger Binding="{Binding IsMuted}" Value="True">
+                                                    <Setter Property="Opacity" Value="0.4"/>
+                                                </DataTrigger>
+                                            </Style.Triggers>
+                                        </Style>
+                                    </Slider.Style>
+                                </Slider>
+                                <!-- Mute toggle -->
+                                <Button Content="{Binding VolumeIcon}"
+                                        Command="{Binding ToggleMuteCommand}"
+                                        Style="{StaticResource TransportButton}"
+                                        FontSize="16" Margin="0,6,0,0"
+                                        ToolTip="Mute / Unmute"/>
+                            </StackPanel>
+                        </Border>
+                    </Popup>
+                </Grid>
+
+                <!-- Identify button + settings popup -->
+                <Grid Grid.Column="5" Margin="4,0,0,0" VerticalAlignment="Center">
+                    <Button x:Name="IdentifyButton"
+                            Content="🎵"
+                            Command="{Binding IdentifyCommand}"
+                            Style="{StaticResource TransportButton}"
+                            FontSize="18"
+                            ToolTip="Identify track (ACRCloud)"/>
+                    <Popup x:Name="AcrSettingsPopup"
+                           IsOpen="{Binding IsAcrSettingsOpen, Mode=TwoWay}"
+                           PlacementTarget="{Binding ElementName=IdentifyButton}"
+                           Placement="Top"
+                           StaysOpen="True"
+                           AllowsTransparency="False">
+                        <Border Background="#252525" BorderBrush="#555" BorderThickness="1"
+                                Padding="0">
+                            <!-- Header -->
+                            <StackPanel>
+                                <DockPanel Background="#1E1E1E" LastChildFill="False">
+                                    <TextBlock Text="⚙ ACRCloud settings"
+                                               Foreground="#CCCCCC" FontSize="12"
+                                               VerticalAlignment="Center"
+                                               DockPanel.Dock="Left"
+                                               Margin="10,8"/>
+                                    <Button DockPanel.Dock="Right"
+                                            Content="✕"
+                                            Command="{Binding CloseAcrSettingsCommand}"
+                                            Foreground="#AAAAAA" Background="Transparent"
+                                            BorderThickness="0" FontSize="12"
+                                            Width="28" Height="28" Cursor="Hand"
+                                            ToolTip="Close">
+                                        <Button.Style>
+                                            <Style TargetType="Button">
+                                                <Setter Property="Template">
+                                                    <Setter.Value>
+                                                        <ControlTemplate TargetType="Button">
+                                                            <Border Background="{TemplateBinding Background}"
+                                                                    CornerRadius="2">
+                                                                <ContentPresenter HorizontalAlignment="Center"
+                                                                                  VerticalAlignment="Center"/>
+                                                            </Border>
+                                                        </ControlTemplate>
+                                                    </Setter.Value>
+                                                </Setter>
+                                                <Style.Triggers>
+                                                    <Trigger Property="IsMouseOver" Value="True">
+                                                        <Setter Property="Background" Value="#444"/>
+                                                    </Trigger>
+                                                </Style.Triggers>
+                                            </Style>
+                                        </Button.Style>
+                                    </Button>
+                                </DockPanel>
+                                <Border BorderBrush="#3A3A3A" BorderThickness="0,1,0,0">
+                                    <Grid Margin="10,10">
+                                        <Grid.RowDefinitions>
+                                            <RowDefinition Height="Auto"/>
+                                            <RowDefinition Height="Auto"/>
+                                            <RowDefinition Height="Auto"/>
+                                            <RowDefinition Height="Auto"/>
+                                        </Grid.RowDefinitions>
+                                        <Grid.ColumnDefinitions>
+                                            <ColumnDefinition Width="60"/>
+                                            <ColumnDefinition Width="200"/>
+                                        </Grid.ColumnDefinitions>
+
+                                        <TextBlock Grid.Row="0" Grid.Column="0" Text="Host"
+                                                   Foreground="#AAAAAA" FontSize="12"
+                                                   VerticalAlignment="Center" Margin="0,0,8,6"/>
+                                        <TextBox Grid.Row="0" Grid.Column="1"
+                                                 Text="{Binding AcrHost, UpdateSourceTrigger=PropertyChanged}"
+                                                 Height="28" Padding="6,0"
+                                                 VerticalContentAlignment="Center"
+                                                 FontSize="12"
+                                                 Background="#1A1A1A" Foreground="White"
+                                                 CaretBrush="White" BorderBrush="#555"
+                                                 Margin="0,0,0,6"/>
+
+                                        <TextBlock Grid.Row="1" Grid.Column="0" Text="Key"
+                                                   Foreground="#AAAAAA" FontSize="12"
+                                                   VerticalAlignment="Center" Margin="0,0,8,6"/>
+                                        <TextBox Grid.Row="1" Grid.Column="1"
+                                                 Text="{Binding AcrKey, UpdateSourceTrigger=PropertyChanged}"
+                                                 Height="28" Padding="6,0"
+                                                 VerticalContentAlignment="Center"
+                                                 FontSize="12"
+                                                 Background="#1A1A1A" Foreground="White"
+                                                 CaretBrush="White" BorderBrush="#555"
+                                                 Margin="0,0,0,6"/>
+
+                                        <TextBlock Grid.Row="2" Grid.Column="0" Text="Secret"
+                                                   Foreground="#AAAAAA" FontSize="12"
+                                                   VerticalAlignment="Center" Margin="0,0,8,10"/>
+                                        <TextBox Grid.Row="2" Grid.Column="1"
+                                                 Text="{Binding AcrSecret, UpdateSourceTrigger=PropertyChanged}"
+                                                 Height="28" Padding="6,0"
+                                                 VerticalContentAlignment="Center"
+                                                 FontSize="12"
+                                                 Background="#1A1A1A" Foreground="White"
+                                                 CaretBrush="White" BorderBrush="#555"
+                                                 Margin="0,0,0,10"/>
+
+                                        <Button Grid.Row="3" Grid.Column="1"
+                                                Content="Save"
+                                                Command="{Binding SaveAcrSettingsCommand}"
+                                                HorizontalAlignment="Right"
+                                                Height="28" Padding="16,0"
+                                                FontSize="12"
+                                                Background="#CC0000" Foreground="White"
+                                                BorderThickness="0" Cursor="Hand">
+                                            <Button.Style>
+                                                <Style TargetType="Button">
+                                                    <Setter Property="Template">
+                                                        <Setter.Value>
+                                                            <ControlTemplate TargetType="Button">
+                                                                <Border Background="{TemplateBinding Background}"
+                                                                        CornerRadius="3"
+                                                                        Padding="{TemplateBinding Padding}">
+                                                                    <ContentPresenter HorizontalAlignment="Center"
+                                                                                      VerticalAlignment="Center"/>
+                                                                </Border>
+                                                            </ControlTemplate>
+                                                        </Setter.Value>
+                                                    </Setter>
+                                                    <Style.Triggers>
+                                                        <Trigger Property="IsMouseOver" Value="True">
+                                                            <Setter Property="Background" Value="#E60000"/>
+                                                        </Trigger>
+                                                    </Style.Triggers>
+                                                </Style>
+                                            </Button.Style>
+                                        </Button>
+                                    </Grid>
+                                </Border>
+                            </StackPanel>
+                        </Border>
+                    </Popup>
+                </Grid>
             </Grid>
         </Border>
     </Grid>

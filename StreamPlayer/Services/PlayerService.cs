@@ -2,6 +2,7 @@ using LibVLCSharp.Shared;
 using StreamPlayer.Models;
 using StreamPlayer.Services.Interfaces;
 using System.Diagnostics;
+using System.IO;
 using System.Text.Json;
 
 namespace StreamPlayer.Services;
@@ -33,14 +34,20 @@ public sealed class PlayerService : IPlayerService, IDisposable
         return info;
     }
 
+    private static readonly string CookiesPath = Path.Combine(
+        Environment.GetFolderPath(Environment.SpecialFolder.ApplicationData),
+        "StreamPlayer", "cookies.txt");
+
     private static async Task<(string[] StreamUrls, VideoInfo Info)> FetchInfoAsync(string url)
     {
+        var cookiesArg = File.Exists(CookiesPath) ? $"--cookies \"{CookiesPath}\"" : string.Empty;
+
         using var process = new Process
         {
             StartInfo = new ProcessStartInfo
             {
                 FileName = "yt-dlp",
-                Arguments = $"-f \"bestvideo[height<=1080]+bestaudio/best\" --dump-json --no-playlist \"{url}\"",
+                Arguments = $"--js-runtimes node --remote-components ejs:github {cookiesArg} -f \"bestvideo[height<=1080]+bestaudio/best\" --dump-json --no-playlist \"{url}\"",
                 RedirectStandardOutput = true,
                 RedirectStandardError = true,
                 UseShellExecute = false,
