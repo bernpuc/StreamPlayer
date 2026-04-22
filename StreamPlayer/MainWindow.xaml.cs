@@ -4,7 +4,6 @@ using System.Windows;
 using System.Windows.Controls;
 using System.Windows.Controls.Primitives;
 using System.Windows.Media;
-using System.Windows.Media.Imaging;
 
 namespace StreamPlayer;
 
@@ -20,55 +19,52 @@ public partial class MainWindow : Window
             VideoPlayer.MediaPlayer = viewModel.MediaPlayer;
 
             UrlBox.MouseEnter += (_, _) => { UrlBox.Focus(); UrlBox.SelectAll(); };
-
-            HistoryList.SelectionChanged += (_, _) =>
-            {
-                if (HistoryList.SelectedItem is HistoryEntry entry)
-                {
-                    viewModel.SelectHistoryEntry(entry);
-                    HistoryList.SelectedItem = null;
-                }
-            };
+            UrlBox.ContextMenuOpening += (_, _) => UrlBox.SelectAll();
 
             SeekSlider.AddHandler(Thumb.DragStartedEvent,
                 new DragStartedEventHandler((_, _) => viewModel.OnSeekStarted()));
             SeekSlider.AddHandler(Thumb.DragCompletedEvent,
                 new DragCompletedEventHandler((_, _) => viewModel.OnSeekCompleted(SeekSlider.Value)));
 
+            PlaylistList.SelectionChanged += (_, _) =>
+            {
+                if (PlaylistList.SelectedItem is PlaylistEntry entry)
+                    viewModel.SelectPlaylistEntry(entry);
+            };
+
             viewModel.PropertyChanged += (_, e) =>
             {
-                if (e.PropertyName == nameof(MainWindowViewModel.VideoInfo))
-                    ApplyVideoInfo(viewModel.VideoInfo);
+                switch (e.PropertyName)
+                {
+                    case nameof(MainWindowViewModel.VideoInfo):
+                        ApplyVideoInfo(viewModel.VideoInfo);
+                        break;
+                    case nameof(MainWindowViewModel.CurrentPlaylistIndex):
+                        SyncPlaylistSelection(viewModel.CurrentPlaylistIndex);
+                        break;
+                    case nameof(MainWindowViewModel.IsPlaylistOpen):
+                        if (viewModel.IsPlaylistOpen)
+                            SyncPlaylistSelection(viewModel.CurrentPlaylistIndex);
+                        break;
+                }
             };
         };
+    }
+
+    private void SyncPlaylistSelection(int idx)
+    {
+        PlaylistList.SelectedIndex = idx;
+        if (idx >= 0 && idx < PlaylistList.Items.Count)
+            PlaylistList.ScrollIntoView(PlaylistList.Items[idx]);
     }
 
     private void ApplyVideoInfo(VideoInfo? info)
     {
         if (info is null)
         {
-            ThumbnailImage.Source = null;
             SeekSlider.Ticks = null;
             SeekSlider.TickPlacement = TickPlacement.None;
             return;
-        }
-
-        // Thumbnail
-        if (!string.IsNullOrEmpty(info.ThumbnailUrl))
-        {
-            try
-            {
-                var bmp = new BitmapImage();
-                bmp.BeginInit();
-                bmp.UriSource = new Uri(info.ThumbnailUrl);
-                bmp.DecodePixelWidth = 240;   // 2× display width — sharp without being huge
-                bmp.EndInit();
-                ThumbnailImage.Source = bmp;
-            }
-            catch (Exception ex)
-            {
-                Console.WriteLine($"[Thumbnail] Failed to load: {ex.Message}");
-            }
         }
 
         // Chapter tick marks on the seek slider

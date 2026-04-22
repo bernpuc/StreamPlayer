@@ -32,6 +32,12 @@ public class HistoryService : IHistoryService
         Save();
     }
 
+    public void Remove(string url)
+    {
+        _entries.RemoveAll(e => e.Url == url);
+        Save();
+    }
+
     private void Load()
     {
         if (!File.Exists(_filePath)) return;

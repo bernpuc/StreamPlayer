@@ -7,4 +7,5 @@ public interface IPlayerService
 {
     MediaPlayer MediaPlayer { get; }
     Task<VideoInfo> PlayAsync(string url);
+    Task<IReadOnlyList<PlaylistEntry>> GetPlaylistEntriesAsync(string url);
 }

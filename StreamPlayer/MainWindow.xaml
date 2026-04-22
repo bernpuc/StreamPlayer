@@ -3,7 +3,7 @@
         xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
         xmlns:vlc="clr-namespace:LibVLCSharp.WPF;assembly=LibVLCSharp.WPF"
         Title="Stream Player" Width="960" Height="700" MinWidth="640" MinHeight="480"
-        Background="#121212">
+        Background="#121212" Icon="StreamPlayer.ico">
     <Window.Resources>
         <Style x:Key="TransportButton" TargetType="Button">
             <Setter Property="Foreground" Value="White"/>
@@ -135,12 +135,12 @@
                                AllowsTransparency="True">
                             <Border Background="#252525" BorderBrush="#555" BorderThickness="1"
                                     MinWidth="400" MaxHeight="320">
-                                <StackPanel>
-                                    <Border BorderBrush="#3A3A3A" BorderThickness="0,0,0,1" Padding="10,6">
+                                <DockPanel LastChildFill="True">
+                                    <Border DockPanel.Dock="Top" BorderBrush="#3A3A3A" BorderThickness="0,0,0,1" Padding="10,6">
                                         <TextBlock Text="Recent videos" Foreground="#777" FontSize="11"/>
                                     </Border>
                                     <!-- Empty state -->
-                                    <TextBlock Text="No history yet." Foreground="#666" FontSize="12"
+                                    <TextBlock DockPanel.Dock="Top" Text="No history yet." Foreground="#666" FontSize="12"
                                                Padding="10,8">
                                         <TextBlock.Style>
                                             <Style TargetType="TextBlock">
@@ -154,46 +154,65 @@
                                         </TextBlock.Style>
                                     </TextBlock>
                                     <!-- History list -->
-                                    <ScrollViewer VerticalScrollBarVisibility="Auto"
+                                    <ScrollViewer VerticalScrollBarVisibility="Visible"
                                                   Visibility="{Binding HasHistory, Converter={StaticResource BoolToVis}}">
-                                        <ListBox x:Name="HistoryList"
-                                                 ItemsSource="{Binding HistoryEntries}"
-                                                 Background="Transparent"
-                                                 BorderThickness="0"
-                                                 Focusable="False">
-                                            <ListBox.ItemTemplate>
+                                        <ItemsControl x:Name="HistoryList"
+                                                      ItemsSource="{Binding HistoryEntries}">
+                                            <ItemsControl.ItemTemplate>
                                                 <DataTemplate>
-                                                    <TextBlock Text="{Binding Title}"
-                                                               Foreground="White" FontSize="12"
-                                                               TextTrimming="CharacterEllipsis"/>
+                                                    <Grid>
+                                                        <Grid.ColumnDefinitions>
+                                                            <ColumnDefinition Width="*"/>
+                                                            <ColumnDefinition Width="Auto"/>
+                                                        </Grid.ColumnDefinitions>
+                                                        <!-- Title — click to load URL -->
+                                                        <Button Grid.Column="0"
+                                                                HorizontalContentAlignment="Left"
+                                                                Command="{Binding DataContext.SelectHistoryEntryCommand, RelativeSource={RelativeSource AncestorType=ItemsControl}}"
+                                                                CommandParameter="{Binding}">
+                                                            <Button.Template>
+                                                                <ControlTemplate TargetType="Button">
+                                                                    <Border x:Name="Bd" Background="Transparent" Padding="10,7">
+                                                                        <TextBlock Text="{Binding Title}"
+                                                                                   Foreground="White" FontSize="12"
+                                                                                   TextTrimming="CharacterEllipsis"/>
+                                                                    </Border>
+                                                                    <ControlTemplate.Triggers>
+                                                                        <Trigger Property="IsMouseOver" Value="True">
+                                                                            <Setter TargetName="Bd" Property="Background" Value="#3A3A3A"/>
+                                                                        </Trigger>
+                                                                    </ControlTemplate.Triggers>
+                                                                </ControlTemplate>
+                                                            </Button.Template>
+                                                        </Button>
+                                                        <!-- Delete button -->
+                                                        <Button Grid.Column="1"
+                                                                Width="30" Cursor="Hand"
+                                                                ToolTip="Remove from history"
+                                                                Command="{Binding DataContext.RemoveHistoryEntryCommand, RelativeSource={RelativeSource AncestorType=ItemsControl}}"
+                                                                CommandParameter="{Binding}">
+                                                            <Button.Template>
+                                                                <ControlTemplate TargetType="Button">
+                                                                    <Border x:Name="Bd" Background="Transparent" Padding="4,7">
+                                                                        <TextBlock x:Name="Glyph" Text="✕"
+                                                                                   Foreground="#666" FontSize="11"
+                                                                                   HorizontalAlignment="Center"/>
+                                                                    </Border>
+                                                                    <ControlTemplate.Triggers>
+                                                                        <Trigger Property="IsMouseOver" Value="True">
+                                                                            <Setter TargetName="Bd" Property="Background" Value="#3A2020"/>
+                                                                            <Setter TargetName="Glyph" Property="Foreground" Value="#FF6B6B"/>
+                                                                        </Trigger>
+                                                                    </ControlTemplate.Triggers>
+                                                                </ControlTemplate>
+                                                            </Button.Template>
+                                                        </Button>
+                                                    </Grid>
                                                 </DataTemplate>
-                                            </ListBox.ItemTemplate>
-                                            <ListBox.ItemContainerStyle>
-                                                <Style TargetType="ListBoxItem">
-                                                    <Setter Property="Padding" Value="10,7"/>
-                                                    <Setter Property="Cursor" Value="Hand"/>
-                                                    <Setter Property="HorizontalContentAlignment" Value="Stretch"/>
-                                                    <Setter Property="Template">
-                                                        <Setter.Value>
-                                                            <ControlTemplate TargetType="ListBoxItem">
-                                                                <Border x:Name="Bd"
-                                                                        Background="Transparent"
-                                                                        Padding="{TemplateBinding Padding}">
-                                                                    <ContentPresenter/>
-                                                                </Border>
-                                                                <ControlTemplate.Triggers>
-                                                                    <Trigger Property="IsMouseOver" Value="True">
-                                                                        <Setter TargetName="Bd" Property="Background" Value="#3A3A3A"/>
-                                                                    </Trigger>
-                                                                </ControlTemplate.Triggers>
-                                                            </ControlTemplate>
-                                                        </Setter.Value>
-                                                    </Setter>
-                                                </Style>
-                                            </ListBox.ItemContainerStyle>
-                                        </ListBox>
+                                            </ItemsControl.ItemTemplate>
+                                        </ItemsControl>
                                     </ScrollViewer>
-                                </StackPanel>
+                                </DockPanel>
                             </Border>
                         </Popup>
                     </Grid>
@@ -234,7 +253,34 @@
         </Border>
 
         <!-- ═══ Row 1: Video ═══ -->
-        <vlc:VideoView x:Name="VideoPlayer" Grid.Row="1" Background="Black"/>
+        <Grid Grid.Row="1" Background="Black">
+            <!-- Thumbnail shown while buffering or stopped (not when paused) -->
+            <Image Source="{Binding ThumbnailSource}" Stretch="Uniform">
+                <Image.Style>
+                    <Style TargetType="Image">
+                        <Setter Property="Visibility" Value="Visible"/>
+                        <Style.Triggers>
+                            <DataTrigger Binding="{Binding CanControl}" Value="True">
+                                <Setter Property="Visibility" Value="Collapsed"/>
+                            </DataTrigger>
+                        </Style.Triggers>
+                    </Style>
+                </Image.Style>
+            </Image>
+            <!-- VideoView shown while playing or paused; Hidden (not Collapsed) to preserve the Win32 HWND -->
+            <vlc:VideoView x:Name="VideoPlayer" Background="Black">
+                <vlc:VideoView.Style>
+                    <Style TargetType="vlc:VideoView">
+                        <Setter Property="Visibility" Value="Hidden"/>
+                        <Style.Triggers>
+                            <DataTrigger Binding="{Binding CanControl}" Value="True">
+                                <Setter Property="Visibility" Value="Visible"/>
+                            </DataTrigger>
+                        </Style.Triggers>
+                    </Style>
+                </vlc:VideoView.Style>
+            </vlc:VideoView>
+        </Grid>
 
         <!-- ═══ Row 2: Info bar (hidden until metadata arrives) ═══ -->
         <Border Grid.Row="2" Background="#181818" Padding="10,8"
@@ -268,6 +314,7 @@
                        Width="120" Height="68"
                        Stretch="UniformToFill"
                        RenderOptions.BitmapScalingMode="HighQuality"
+                       Source="{Binding ThumbnailSource}"
                        Margin="0,0,12,0"/>
 
                 <!-- Title + Channel -->
@@ -299,6 +346,7 @@
                     <ColumnDefinition Width="Auto"/>  <!-- time display  -->
                     <ColumnDefinition Width="Auto"/>  <!-- volume        -->
                     <ColumnDefinition Width="Auto"/>  <!-- identify      -->
+                    <ColumnDefinition Width="Auto"/>  <!-- playlist      -->
                 </Grid.ColumnDefinitions>
 
                 <!-- Transport buttons -->
@@ -575,6 +623,118 @@
                                     </Grid>
                                 </Border>
                             </StackPanel>
+                        </Border>
+                    </Popup>
+                </Grid>
+
+                <!-- Playlist button + popup -->
+                <Grid Grid.Column="6" Margin="4,0,0,0" VerticalAlignment="Center">
+                    <Button x:Name="PlaylistButton"
+                            Content="☰"
+                            Command="{Binding TogglePlaylistCommand}"
+                            Style="{StaticResource TransportButton}"
+                            FontSize="18"
+                            ToolTip="{Binding CurrentTrackLabel, StringFormat='Playlist ({0})'}"/>
+                    <Popup x:Name="PlaylistPopup"
+                           IsOpen="{Binding IsPlaylistOpen, Mode=TwoWay}"
+                           PlacementTarget="{Binding ElementName=PlaylistButton}"
+                           Placement="Top"
+                           StaysOpen="False"
+                           AllowsTransparency="True">
+                        <Border Background="#252525" BorderBrush="#555" BorderThickness="1"
+                                Width="320" MaxHeight="420">
+                            <DockPanel LastChildFill="True">
+                                <!-- Header: Prev | track label | Next -->
+                                <Border DockPanel.Dock="Top"
+                                        Background="#1E1E1E" BorderBrush="#3A3A3A" BorderThickness="0,0,0,1" Padding="6,4">
+                                    <Grid>
+                                        <Grid.ColumnDefinitions>
+                                            <ColumnDefinition Width="Auto"/>
+                                            <ColumnDefinition Width="*"/>
+                                            <ColumnDefinition Width="Auto"/>
+                                        </Grid.ColumnDefinitions>
+                                        <Button Grid.Column="0"
+                                                Content="◀"
+                                                Command="{Binding PreviousTrackCommand}"
+                                                Style="{StaticResource TransportButton}"
+                                                Width="28" Height="28" FontSize="12"
+                                                ToolTip="Previous track"/>
+                                        <TextBlock Grid.Column="1"
+                                                   Text="{Binding CurrentTrackLabel}"
+                                                   Foreground="#AAAAAA" FontSize="11"
+                                                   HorizontalAlignment="Center"
+                                                   VerticalAlignment="Center"/>
+                                        <Button Grid.Column="2"
+                                                Content="▶"
+                                                Command="{Binding NextTrackCommand}"
+                                                Style="{StaticResource TransportButton}"
+                                                Width="28" Height="28" FontSize="12"
+                                                ToolTip="Next track"/>
+                                    </Grid>
+                                </Border>
+                                <!-- Playlist entries -->
+                                <ScrollViewer VerticalScrollBarVisibility="Visible">
+                                    <ListBox x:Name="PlaylistList"
+                                             ItemsSource="{Binding PlaylistEntries}"
+                                             Background="Transparent"
+                                             BorderThickness="0"
+                                             Focusable="False">
+                                        <ListBox.ItemTemplate>
+                                            <DataTemplate>
+                                                <Grid>
+                                                    <Grid.ColumnDefinitions>
+                                                        <ColumnDefinition Width="16"/>
+                                                        <ColumnDefinition Width="*"/>
+                                                    </Grid.ColumnDefinitions>
+                                                    <TextBlock Grid.Column="0" Text="▶"
+                                                               Foreground="#5599FF" FontSize="10"
+                                                               VerticalAlignment="Center">
+                                                        <TextBlock.Style>
+                                                            <Style TargetType="TextBlock">
+                                                                <Setter Property="Visibility" Value="Hidden"/>
+                                                                <Style.Triggers>
+                                                                    <DataTrigger Binding="{Binding RelativeSource={RelativeSource AncestorType=ListBoxItem}, Path=IsSelected}" Value="True">
+                                                                        <Setter Property="Visibility" Value="Visible"/>
+                                                                    </DataTrigger>
+                                                                </Style.Triggers>
+                                                            </Style>
+                                                        </TextBlock.Style>
+                                                    </TextBlock>
+                                                    <TextBlock Grid.Column="1" Text="{Binding Title}"
+                                                               Foreground="White" FontSize="12"
+                                                               TextTrimming="CharacterEllipsis"/>
+                                                </Grid>
+                                            </DataTemplate>
+                                        </ListBox.ItemTemplate>
+                                        <ListBox.ItemContainerStyle>
+                                            <Style TargetType="ListBoxItem">
+                                                <Setter Property="Padding" Value="10,7"/>
+                                                <Setter Property="Cursor" Value="Hand"/>
+                                                <Setter Property="HorizontalContentAlignment" Value="Stretch"/>
+                                                <Setter Property="Template">
+                                                    <Setter.Value>
+                                                        <ControlTemplate TargetType="ListBoxItem">
+                                                            <Border x:Name="Bd"
+                                                                    Background="Transparent"
+                                                                    Padding="{TemplateBinding Padding}">
+                                                                <ContentPresenter/>
+                                                            </Border>
+                                                            <ControlTemplate.Triggers>
+                                                                <Trigger Property="IsMouseOver" Value="True">
+                                                                    <Setter TargetName="Bd" Property="Background" Value="#3A3A3A"/>
+                                                                </Trigger>
+                                                                <Trigger Property="IsSelected" Value="True">
+                                                                    <Setter TargetName="Bd" Property="Background" Value="#2A4A7A"/>
+                                                                </Trigger>
+                                                            </ControlTemplate.Triggers>
+                                                        </ControlTemplate>
+                                                    </Setter.Value>
+                                                </Setter>
+                                            </Style>
+                                        </ListBox.ItemContainerStyle>
+                                    </ListBox>
+                                </ScrollViewer>
+                            </DockPanel>
                         </Border>
                     </Popup>
                 </Grid>

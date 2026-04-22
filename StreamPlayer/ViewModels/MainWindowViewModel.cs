@@ -3,7 +3,11 @@ using Prism.Commands;
 using Prism.Mvvm;
 using StreamPlayer.Models;
 using StreamPlayer.Services.Interfaces;
+using System.Collections.ObjectModel;
 using System.Diagnostics;
+using System.IO;
+using System.Runtime.InteropServices;
+using System.Text.Json;
 using System.Windows;
 
 namespace StreamPlayer.ViewModels;
@@ -34,6 +38,7 @@ public class MainWindowViewModel : BindableBase
     private string _currentChapterTitle = string.Empty;
     private string _chapterArtist       = string.Empty;
     private string _chapterSong         = string.Empty;
+    private System.Windows.Media.ImageSource? _thumbnailSource;
 
     // History state
     private IReadOnlyList<HistoryEntry> _historyEntries = [];
@@ -51,15 +56,17 @@ public class MainWindowViewModel : BindableBase
     private string _acrKey           = string.Empty;
     private string _acrSecret        = string.Empty;
 
+    // Playlist state
+    private List<PlaylistEntry> _playlist = [];
+    private int _currentPlaylistIndex = -1;
+    private bool _isPlaylistOpen;
+    private ObservableCollection<PlaylistEntry> _playlistEntries = new();
+
     private const long SeekStepMs = 10_000;
 
-    private static readonly HashSet<string> YouTubeHosts =
-    [
-        "youtube.com",
-        "www.youtube.com",
-        "youtu.be",
-        "m.youtube.com"
-    ];
+    private static readonly string SettingsPath = Path.Combine(
+        Environment.GetFolderPath(Environment.SpecialFolder.ApplicationData),
+        "StreamPlayer", "settings.json");
 
     // --- URL bar properties ---
 
@@ -153,6 +160,7 @@ public class MainWindowViewModel : BindableBase
             if (!SetProperty(ref _volume, Math.Clamp(value, 0, 100))) return;
             MediaPlayer.Volume = _volume;
             RaisePropertyChanged(nameof(VolumeIcon));
+            SaveSettings();
         }
     }
 
@@ -164,6 +172,7 @@ public class MainWindowViewModel : BindableBase
             if (!SetProperty(ref _isMuted, value)) return;
             MediaPlayer.Mute = _isMuted;
             RaisePropertyChanged(nameof(VolumeIcon));
+            SaveSettings();
         }
     }
 
@@ -214,12 +223,55 @@ public class MainWindowViewModel : BindableBase
         set => SetProperty(ref _acrSecret, value);
     }
 
+    // --- Playlist properties ---
+
+    public bool IsPlaylistOpen
+    {
+        get => _isPlaylistOpen;
+        set => SetProperty(ref _isPlaylistOpen, value);
+    }
+
+    public ObservableCollection<PlaylistEntry> PlaylistEntries
+    {
+        get => _playlistEntries;
+        private set
+        {
+            SetProperty(ref _playlistEntries, value);
+            RaisePropertyChanged(nameof(HasPlaylist));
+            RaisePropertyChanged(nameof(CurrentTrackLabel));
+            TogglePlaylistCommand?.RaiseCanExecuteChanged();
+        }
+    }
+
+    public bool HasPlaylist => _playlistEntries.Count > 0;
+
+    public int CurrentPlaylistIndex
+    {
+        get => _currentPlaylistIndex;
+        private set
+        {
+            SetProperty(ref _currentPlaylistIndex, value);
+            RaisePropertyChanged(nameof(CurrentTrackLabel));
+            NextTrackCommand.RaiseCanExecuteChanged();
+            PreviousTrackCommand.RaiseCanExecuteChanged();
+        }
+    }
+
+    public string CurrentTrackLabel =>
+        HasPlaylist ? $"{_currentPlaylistIndex + 1} / {_playlistEntries.Count}" : string.Empty;
+
     // --- Metadata properties ---
 
     public VideoInfo? VideoInfo
     {
         get => _videoInfo;
         private set { SetProperty(ref _videoInfo, value); RaisePropertyChanged(nameof(HasMetadata)); }
+    }
+
+    public System.Windows.Media.ImageSource? ThumbnailSource
+    {
+        get => _thumbnailSource;
+        private set => SetProperty(ref _thumbnailSource, value);
     }
 
     public bool HasMetadata => _videoInfo != null;
@@ -277,6 +329,11 @@ public class MainWindowViewModel : BindableBase
     public DelegateCommand IdentifyCommand         { get; }
     public DelegateCommand SaveAcrSettingsCommand  { get; }
     public DelegateCommand CloseAcrSettingsCommand { get; }
+    public DelegateCommand TogglePlaylistCommand   { get; }
+    public DelegateCommand NextTrackCommand        { get; }
+    public DelegateCommand PreviousTrackCommand    { get; }
+    public DelegateCommand<HistoryEntry> SelectHistoryEntryCommand { get; }
+    public DelegateCommand<HistoryEntry> RemoveHistoryEntryCommand { get; }
 
     public MainWindowViewModel(IPlayerService playerService, IHistoryService historyService, IAcrCloudService acrCloudService)
     {
@@ -293,7 +350,9 @@ public class MainWindowViewModel : BindableBase
         ToggleHistoryCommand  = new DelegateCommand(() => IsHistoryOpen = !IsHistoryOpen);
         ToggleVolumeCommand   = new DelegateCommand(() => IsVolumeOpen = !IsVolumeOpen);
         ToggleMuteCommand     = new DelegateCommand(() => IsMuted = !IsMuted);
+        LoadSettings();
         MediaPlayer.Volume    = _volume;
+        MediaPlayer.Mute      = _isMuted;
 
         OpenLastFmCommand    = new DelegateCommand(ExecuteOpenLastFm,    () => HasMetadata);
         OpenGeniusCommand    = new DelegateCommand(ExecuteOpenGenius,    () => HasMetadata);
@@ -322,26 +381,58 @@ public class MainWindowViewModel : BindableBase
 
         CloseAcrSettingsCommand = new DelegateCommand(() => IsAcrSettingsOpen = false);
 
+        TogglePlaylistCommand = new DelegateCommand(() => IsPlaylistOpen = !IsPlaylistOpen, () => HasPlaylist);
+        NextTrackCommand      = new DelegateCommand(async () => await AdvancePlaylistAsync(+1),
+                                    () => HasPlaylist && _currentPlaylistIndex < _playlist.Count - 1);
+        PreviousTrackCommand  = new DelegateCommand(async () => await AdvancePlaylistAsync(-1),
+                                    () => HasPlaylist && _currentPlaylistIndex > 0);
+
+        SelectHistoryEntryCommand = new DelegateCommand<HistoryEntry>(entry =>
+        {
+            Url = entry.Url;
+            IsHistoryOpen = false;
+        });
+        RemoveHistoryEntryCommand = new DelegateCommand<HistoryEntry>(entry =>
+        {
+            _historyService.Remove(entry.Url);
+            HistoryEntries = [.._historyService.Entries];
+        });
+
         // All handlers use BeginInvoke (async) — never blocks the VLC internal thread.
         MediaPlayer.Playing += (_, _) =>
         {
             Log("[VLC] Playing");
+            KeepSystemAwake(true);
             Dispatch(() => { IsPlaying = true; CanControl = true; StatusMessage = string.Empty; });
         };
         MediaPlayer.Paused += (_, _) =>
         {
             Log("[VLC] Paused");
+            KeepSystemAwake(false);
             Dispatch(() => IsPlaying = false);
         };
         MediaPlayer.Stopped += (_, _) =>
         {
             Log("[VLC] Stopped");
+            KeepSystemAwake(false);
             Dispatch(() => { IsPlaying = false; CanControl = false; ResetPlayback(); StatusMessage = string.Empty; });
         };
         MediaPlayer.EndReached += (_, _) =>
         {
             Log("[VLC] EndReached");
-            Dispatch(() => { IsPlaying = false; CanControl = false; ResetPlayback(); StatusMessage = "Playback finished."; });
+            Dispatch(() =>
+            {
+                IsPlaying = false;
+                CanControl = false;
+                if (HasPlaylist && _currentPlaylistIndex < _playlist.Count - 1)
+                    _ = AdvancePlaylistAsync(+1);
+                else
+                {
+                    KeepSystemAwake(false);
+                    ResetPlayback();
+                    StatusMessage = "Playback finished.";
+                }
+            });
         };
         MediaPlayer.Buffering += (_, e) =>
         {
@@ -375,14 +466,7 @@ public class MainWindowViewModel : BindableBase
         if (!Uri.TryCreate(_url, UriKind.Absolute, out var uri) ||
             uri.Scheme is not "http" and not "https")
         {
-            ValidationMessage = "Not a valid URL.";
-            IsValidUrl = false;
-            return;
-        }
-
-        if (!YouTubeHosts.Contains(uri.Host.ToLowerInvariant()))
-        {
-            ValidationMessage = "Not a YouTube URL.";
+            ValidationMessage = "Enter a valid http/https URL.";
             IsValidUrl = false;
             return;
         }
@@ -402,21 +486,18 @@ public class MainWindowViewModel : BindableBase
         var urlSnapshot = _url;
         try
         {
-            var info = await _playerService.PlayAsync(urlSnapshot);
-            Log($"[Play] Metadata: \"{info.Title}\" by {info.Channel}, {info.DurationMs}ms, {info.Chapters.Count} chapters");
-
-            VideoInfo = info;
-            CurrentChapterTitle = string.Empty;
-
-            // Seed duration from metadata so the seek bar is accurate before VLC's LengthChanged fires.
-            if (info.DurationMs > 0)
-                _duration = info.DurationMs;
-
-            _historyService.Add(info.Title, urlSnapshot);
-            HistoryEntries = [.._historyService.Entries];
-            RaiseLookupCanExecuteChanged();
-
-            StatusMessage = string.Empty;
+            if (urlSnapshot.Contains("list="))
+            {
+                if (urlSnapshot.Contains("/playlist?"))
+                    await ExecutePlayPlaylistAsync(urlSnapshot);
+                else
+                    await ExecutePlayWithBackgroundPlaylistAsync(urlSnapshot);
+            }
+            else
+            {
+                ClearPlaylist();
+                await PlaySingleAsync(urlSnapshot, addToHistory: true);
+            }
         }
         catch (Exception ex)
         {
@@ -427,6 +508,138 @@ public class MainWindowViewModel : BindableBase
         {
             IsLoading = false;
         }
+    }
+
+    private async Task PlaySingleAsync(string url, bool addToHistory)
+    {
+        var info = await _playerService.PlayAsync(url);
+        Log($"[Play] Metadata: \"{info.Title}\" by {info.Channel}, {info.DurationMs}ms, {info.Chapters.Count} chapters");
+
+        VideoInfo = info;
+        CurrentChapterTitle = string.Empty;
+
+        if (!string.IsNullOrEmpty(info.ThumbnailUrl))
+        {
+            try
+            {
+                var bmp = new System.Windows.Media.Imaging.BitmapImage();
+                bmp.BeginInit();
+                bmp.UriSource = new Uri(info.ThumbnailUrl);
+                bmp.EndInit();
+                ThumbnailSource = bmp;
+            }
+            catch { ThumbnailSource = null; }
+        }
+        else
+        {
+            ThumbnailSource = null;
+        }
+
+        // Seed duration from metadata so the seek bar is accurate before VLC's LengthChanged fires.
+        if (info.DurationMs > 0)
+            _duration = info.DurationMs;
+
+        if (addToHistory)
+        {
+            _historyService.Add(info.Title, url);
+            HistoryEntries = [.._historyService.Entries];
+        }
+
+        RaiseLookupCanExecuteChanged();
+        StatusMessage = string.Empty;
+    }
+
+    private async Task ExecutePlayPlaylistAsync(string playlistUrl)
+    {
+        StatusMessage = "Loading playlist…";
+        var entries = await _playerService.GetPlaylistEntriesAsync(playlistUrl);
+        if (entries.Count == 0)
+            throw new InvalidOperationException("Playlist is empty or could not be loaded.");
+
+        SetPlaylist(entries, 0);
+        await PlaySingleAsync(_playlist[0].Url, addToHistory: false);
+
+        _historyService.Add(_playlist[0].Title, playlistUrl);
+        HistoryEntries = [.._historyService.Entries];
+    }
+
+    private async Task ExecutePlayWithBackgroundPlaylistAsync(string url)
+    {
+        await PlaySingleAsync(url, addToHistory: true);
+
+        _ = Task.Run(async () =>
+        {
+            try
+            {
+                var entries = await _playerService.GetPlaylistEntriesAsync(url);
+                if (entries.Count == 0) return;
+                var videoId = ExtractVideoId(url);
+                var matchIndex = entries.ToList().FindIndex(e => ExtractVideoId(e.Url) == videoId);
+                Dispatch(() => SetPlaylist(entries, Math.Max(0, matchIndex)));
+            }
+            catch (Exception ex)
+            {
+                Log($"[Playlist] Background fetch failed: {ex.Message}");
+            }
+        });
+    }
+
+    private async Task AdvancePlaylistAsync(int delta)
+    {
+        CurrentPlaylistIndex = _currentPlaylistIndex + delta;
+        await PlayAtCurrentIndexAsync();
+    }
+
+    public void SelectPlaylistEntry(PlaylistEntry entry)
+    {
+        CurrentPlaylistIndex = entry.Index;
+        IsPlaylistOpen = false;
+        _ = PlayAtCurrentIndexAsync();
+    }
+
+    private async Task PlayAtCurrentIndexAsync()
+    {
+        IsLoading = true;
+        StatusMessage = "Fetching stream info…";
+        try
+        {
+            await PlaySingleAsync(_playlist[_currentPlaylistIndex].Url, addToHistory: false);
+        }
+        catch (Exception ex)
+        {
+            Log($"[Playlist] Playback error: {ex.Message}");
+            StatusMessage = $"Error: {ex.Message}";
+        }
+        finally
+        {
+            IsLoading = false;
+        }
+    }
+
+    private void SetPlaylist(IReadOnlyList<PlaylistEntry> entries, int startIndex)
+    {
+        _playlist = [..entries];
+        PlaylistEntries = new ObservableCollection<PlaylistEntry>(entries);
+        CurrentPlaylistIndex = startIndex;
+    }
+
+    private void ClearPlaylist()
+    {
+        _playlist = [];
+        _currentPlaylistIndex = -1;
+        PlaylistEntries = new ObservableCollection<PlaylistEntry>();
+        RaisePropertyChanged(nameof(CurrentPlaylistIndex));
+        NextTrackCommand?.RaiseCanExecuteChanged();
+        PreviousTrackCommand?.RaiseCanExecuteChanged();
+    }
+
+    private static string? ExtractVideoId(string url)
+    {
+        var vIdx = url.IndexOf("v=", StringComparison.OrdinalIgnoreCase);
+        if (vIdx < 0) return null;
+        var start = vIdx + 2;
+        var end = url.IndexOf('&', start);
+        return end < 0 ? url[start..] : url[start..end];
     }
 
     private void ExecutePauseResume()
@@ -444,19 +657,20 @@ public class MainWindowViewModel : BindableBase
 
     private void ExecuteRewind()
     {
+        if (_duration <= 0) return;
         long before = MediaPlayer.Time;
         long target = Math.Max(0, before - SeekStepMs);
         Log($"[Rewind] {FormatMs(before)} → {FormatMs(target)}");
-        MediaPlayer.Time = target;
+        MediaPlayer.Position = (float)target / _duration;
     }
 
     private void ExecuteFastForward()
     {
+        if (_duration <= 0) return;
         long before = MediaPlayer.Time;
-        long len    = MediaPlayer.Length;
-        long target = len > 0 ? Math.Min(len, before + SeekStepMs) : before;
-        Log($"[FastForward] {FormatMs(before)} → {FormatMs(target)}  (len={FormatMs(len)})");
-        MediaPlayer.Time = target;
+        long target = Math.Min(_duration, before + SeekStepMs);
+        Log($"[FastForward] {FormatMs(before)} → {FormatMs(target)}");
+        MediaPlayer.Position = (float)target / _duration;
     }
 
     // --- Artist lookup commands ---
@@ -590,9 +804,8 @@ public class MainWindowViewModel : BindableBase
         _isSeeking = false;
         if (CanControl && _duration > 0)
         {
-            long target = (long)(sliderValue * _duration);
-            Log($"[Seek] DragCompleted sliderValue={sliderValue:F3} → {FormatMs(target)}");
-            MediaPlayer.Time = target;
+            Log($"[Seek] DragCompleted sliderValue={sliderValue:F3} → {FormatMs((long)(sliderValue * _duration))}");
+            MediaPlayer.Position = (float)sliderValue;
         }
         else
         {
@@ -631,6 +844,7 @@ public class MainWindowViewModel : BindableBase
         SliderPosition = 0;
         TimeDisplay = "0:00 / 0:00";
         CurrentChapterTitle = string.Empty;
+        ThumbnailSource = null;
         VideoInfo = null;
         RaiseLookupCanExecuteChanged();
     }
@@ -643,7 +857,44 @@ public class MainWindowViewModel : BindableBase
     }
 
     // BeginInvoke (async) — never blocks the VLC internal thread.
+    private void LoadSettings()
+    {
+        try
+        {
+            if (!File.Exists(SettingsPath)) return;
+            var s = JsonSerializer.Deserialize<AppSettings>(File.ReadAllText(SettingsPath));
+            if (s is null) return;
+            _volume = Math.Clamp(s.Volume, 0, 100);
+            _isMuted = s.IsMuted;
+        }
+        catch (Exception ex)
+        {
+            Log($"[Settings] Load failed: {ex.Message}");
+        }
+    }
+
+    private void SaveSettings()
+    {
+        try
+        {
+            Directory.CreateDirectory(Path.GetDirectoryName(SettingsPath)!);
+            File.WriteAllText(SettingsPath, JsonSerializer.Serialize(new AppSettings(_volume, _isMuted)));
+        }
+        catch (Exception ex)
+        {
+            Log($"[Settings] Save failed: {ex.Message}");
+        }
+    }
+
     private static void Dispatch(Action a) => Application.Current.Dispatcher.BeginInvoke(a);
 
     private static void Log(string message) => Console.WriteLine($"[{DateTime.Now:HH:mm:ss.fff}] {message}");
+
+    [DllImport("kernel32.dll")]
+    private static extern uint SetThreadExecutionState(uint esFlags);
+    private const uint ES_CONTINUOUS      = 0x80000000;
+    private const uint ES_SYSTEM_REQUIRED = 0x00000001;
+
+    private static void KeepSystemAwake(bool awake) =>
+        SetThreadExecutionState(awake ? ES_CONTINUOUS | ES_SYSTEM_REQUIRED : ES_CONTINUOUS);
 }

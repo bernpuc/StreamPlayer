@@ -1,6 +1,6 @@
 # StreamPlayer
 
-A WPF (.NET 9) YouTube player. Paste a YouTube URL, hit Play — video streams inside the app window with full transport controls and video metadata display.
+A WPF (.NET 9) media player. Paste any URL supported by yt-dlp, hit Play — video or audio streams inside the app window with full transport controls, playlist support, and track identification.
 
 ## Prerequisites
 
@@ -8,8 +8,9 @@ A WPF (.NET 9) YouTube player. Paste a YouTube URL, hit Play — video streams i
 |---|---|---|
 | [.NET 9 SDK](https://dotnet.microsoft.com/download/dotnet/9.0) | 9.0+ | |
 | [yt-dlp](https://github.com/yt-dlp/yt-dlp/releases) | latest | Must be on `PATH` |
+| [Node.js](https://nodejs.org/) | any LTS | Required by yt-dlp's JS challenge solver |
 
-yt-dlp handles YouTube stream resolution. The bundled VLC lua scripts inside `VideoLAN.LibVLC.Windows` are outdated for YouTube — yt-dlp is the reliable path.
+yt-dlp handles stream resolution and metadata. The bundled VLC lua scripts are outdated for modern sites — yt-dlp is the reliable path.
 
 ## Build & Run
 
@@ -20,41 +21,48 @@ dotnet run --project StreamPlayer/StreamPlayer
 
 ## Features
 
-- **YouTube URL validation** — accepts `youtube.com`, `www.youtube.com`, `youtu.be`, `m.youtube.com`; rejects everything else with an inline message
-- **Metadata display** — title, channel, thumbnail (poster image), and duration appear as soon as yt-dlp resolves the URL, before VLC begins rendering
+- **Any yt-dlp supported URL** — YouTube, Vimeo, SoundCloud, Twitch, and thousands of other sites
+- **YouTube playlist support** — lazy enumeration via `--flat-playlist`; auto-advances at end of each track; playlist popup with Prev/Next navigation and jump-to-entry
+- **Thumbnail display** — shown in the video panel while buffering or stopped, replaced by live video once playing
+- **Metadata display** — title, channel, thumbnail, and duration appear before VLC begins rendering
 - **Embedded VLC player** — video renders inside the app window via LibVLCSharp.WPF
 - **Transport controls** — ⏮ rewind 10 s · ▶/⏸ pause-resume · ⏹ stop · ⏭ fast-forward 10 s
 - **Seek bar** — drag to seek; chapter tick marks shown for videos that have chapters
 - **Chapter tracking** — current chapter name displayed live next to the time counter
+- **Volume control** — slider + mute toggle; setting persisted across launches
+- **History** — last 20 played URLs; click to reload, ✕ to remove individual entries
+- **ACRCloud track identification** — captures 8 s of system audio and identifies the playing track
+- **Power saving friendly** — releases display and system wake locks when not playing
 - **Buffering feedback** — status bar shows buffering percentage during network hiccups
 
 ## Layout
 
 ```
-┌─────────────────────────────────────────────────────┐
-│  URL: [________________________________]  [▶ Play]  │
-├─────────────────────────────────────────────────────┤
-│                                                     │
-│                    Video                            │
-│                                                     │
-├──────────────────────────────────────────────────── ┤
-│  [thumbnail]  Title                  Channel · dur  │
-├─────────────────────────────────────────────────────┤
-│  ⏮ ▶/⏸ ⏹ ⏭  [═══|══●═══|══]  § Chapter  0:12/10:23 │
-└─────────────────────────────────────────────────────┘
+┌──────────────────────────────────────────────────────────────┐
+│  [⏱ History ▾]  URL: [______________________________] [Play] │
+├──────────────────────────────────────────────────────────────┤
+│                                                              │
+│               Video / Thumbnail                              │
+│                                                              │
+├──────────────────────────────────────────────────────────────┤
+│  [thumbnail]  Title                       Channel · dur      │
+├──────────────────────────────────────────────────────────────┤
+│  ⏮ ▶/⏸ ⏹ ⏭  [══|══●══|══]  § Chapter  0:12/10:23  🔊 🎵 ☰  │
+└──────────────────────────────────────────────────────────────┘
 ```
 
 ## NuGet packages
 
 | Package | Version | Purpose |
 |---|---|---|
-| `Prism.DryIoc` | 9.0.537 | MVVM framework + DI |
+| `Prism.DryIoc` | 9.* | MVVM framework + DI |
 | `LibVLCSharp.WPF` | 3.9.6 | WPF VideoView control |
 | `VideoLAN.LibVLC.Windows` | 3.0.23 | Native libvlc binaries |
+| `NAudio` | 2.2.1 | WASAPI loopback capture for ACRCloud |
 
-## Known limitations
+## Notes
 
-- **YouTube only** — the URL validator rejects non-YouTube links by design
-- **yt-dlp must be on PATH** — the app does not bundle it; install via `winget install yt-dlp.yt-dlp` or from the [releases page](https://github.com/yt-dlp/yt-dlp/releases)
-- **DASH streams** — YouTube serves video and audio as separate tracks; yt-dlp resolves both and VLC stitches them together via `:input-slave`
-- **Playlist URLs** — `&list=...` parameters are ignored (`--no-playlist`); only the individual video plays
+- **yt-dlp must be on PATH** — install via `winget install yt-dlp.yt-dlp` or from the [releases page](https://github.com/yt-dlp/yt-dlp/releases)
+- **DASH streams** — video and audio are served as separate tracks; yt-dlp resolves both and VLC stitches them via `:input-slave`
+- **Cookies** — if YouTube bot-detection triggers, export `cookies.txt` (via "Get cookies.txt LOCALLY" browser extension) to `%APPDATA%\StreamPlayer\cookies.txt`
+- **ACRCloud** — requires a free account at [acrcloud.com](https://www.acrcloud.com/); create an *Audio & Video Recognition* project to obtain credentials

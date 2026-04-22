@@ -16,7 +16,7 @@ public sealed class PlayerService : IPlayerService, IDisposable
     public PlayerService()
     {
         Core.Initialize();
-        _libVlc = new LibVLC();
+        _libVlc = new LibVLC("--no-disable-screensaver");
         MediaPlayer = new MediaPlayer(_libVlc);
     }
 
@@ -128,6 +128,62 @@ public sealed class PlayerService : IPlayerService, IDisposable
             throw new InvalidOperationException("yt-dlp returned no stream URLs.");
 
         return (streamUrls, info);
+    }
+
+    public async Task<IReadOnlyList<PlaylistEntry>> GetPlaylistEntriesAsync(string url)
+    {
+        var cookiesArg = File.Exists(CookiesPath) ? $"--cookies \"{CookiesPath}\"" : string.Empty;
+
+        using var process = new Process
+        {
+            StartInfo = new ProcessStartInfo
+            {
+                FileName = "yt-dlp",
+                Arguments = $"--js-runtimes node --remote-components ejs:github {cookiesArg} --flat-playlist --yes-playlist --dump-json \"{url}\"",
+                RedirectStandardOutput = true,
+                RedirectStandardError = true,
+                UseShellExecute = false,
+                CreateNoWindow = true
+            }
+        };
+
+        process.Start();
+
+        var outputTask = process.StandardOutput.ReadToEndAsync();
+        var errorTask  = process.StandardError.ReadToEndAsync();
+        await process.WaitForExitAsync();
+        var output = await outputTask;
+        var error  = await errorTask;
+
+        if (process.ExitCode != 0)
+            throw new InvalidOperationException(error.Trim());
+
+        if (string.IsNullOrWhiteSpace(output))
+            throw new InvalidOperationException("yt-dlp returned no playlist data.");
+
+        var entries = new List<PlaylistEntry>();
+        var index = 0;
+        foreach (var line in output.Split('\n', StringSplitOptions.RemoveEmptyEntries))
+        {
+            var trimmed = line.Trim();
+            if (string.IsNullOrEmpty(trimmed)) continue;
+            try
+            {
+                using var doc = JsonDocument.Parse(trimmed);
+                var root = doc.RootElement;
+                var title = root.TryGetProperty("title", out var t) ? t.GetString() ?? $"Track {index + 1}" : $"Track {index + 1}";
+                string? entryUrl = null;
+                if (root.TryGetProperty("url", out var u)) entryUrl = u.GetString();
+                if (entryUrl is null && root.TryGetProperty("webpage_url", out var wu)) entryUrl = wu.GetString();
+                if (entryUrl is null && root.TryGetProperty("id", out var id) && id.GetString() is { } videoId)
+                    entryUrl = $"https://www.youtube.com/watch?v={videoId}";
+                if (entryUrl is not null)
+                    entries.Add(new PlaylistEntry(index++, title, entryUrl));
+            }
+            catch (JsonException) { }
+        }
+
+        return entries;
     }
 
     public void Dispose()

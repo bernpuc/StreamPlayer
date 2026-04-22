@@ -6,4 +6,5 @@ public interface IHistoryService
 {
     IReadOnlyList<HistoryEntry> Entries { get; }
     void Add(string title, string url);
+    void Remove(string url);
 }
