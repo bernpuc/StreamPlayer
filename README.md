@@ -67,6 +67,11 @@ dotnet run --project StreamPlayer/StreamPlayer
 
 - **yt-dlp must be on PATH** — install via `winget install yt-dlp.yt-dlp` or from the [releases page](https://github.com/yt-dlp/yt-dlp/releases)
 - **DASH streams** — video and audio are served as separate tracks; yt-dlp resolves both and VLC stitches them via `:input-slave`
-- **Cookies** — if YouTube bot-detection triggers, export `cookies.txt` (via "Get cookies.txt LOCALLY" browser extension) to `%APPDATA%\StreamPlayer\cookies.txt`
+- **Cookies** — if YouTube returns a bot-detection error, you need to supply your browser's cookies:
+  1. In Chrome or Edge, install the [Get cookies.txt LOCALLY](https://chrome.google.com/webstore/detail/get-cookiestxt-locally/cclelndahbckbenkjhflpdbgdldlbecc) extension
+  2. Navigate to [youtube.com](https://www.youtube.com) while signed in
+  3. Click the extension icon and export cookies for the current site
+  4. Save the file to `%APPDATA%\StreamPlayer\cookies.txt` (create the `StreamPlayer` folder if it doesn't exist)
+  5. Restart StreamPlayer — yt-dlp will pick up the cookies automatically on the next load
 - **ACRCloud** — requires a free account at [acrcloud.com](https://www.acrcloud.com/); create an *Audio & Video Recognition* project to obtain credentials
 - **Bandwidth** — measured at typical YouTube streams: audio-only ≈ 0.3 Mbps · low quality (480p) ≈ 1.0 Mbps · high quality (1080p) ≈ 2.8 Mbps
