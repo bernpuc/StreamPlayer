@@ -6,5 +6,6 @@
     <Application.Resources>
         <BooleanToVisibilityConverter x:Key="BoolToVis"/>
         <converters:MsToTimeConverter x:Key="MsToTimeConverter"/>
+        <converters:EnumToBoolConverter x:Key="EnumToBool"/>
     </Application.Resources>
 </prism:PrismApplication>

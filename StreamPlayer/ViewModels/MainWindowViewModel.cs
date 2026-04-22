@@ -49,6 +49,11 @@ public class MainWindowViewModel : BindableBase
     private bool _isMuted      = false;
     private bool _isVolumeOpen = false;
 
+    // Settings panel state
+    private VideoQuality _videoQuality = VideoQuality.Low;
+    private bool _audioOnly = false;
+    private bool _isSettingsOpen = false;
+
     // ACRCloud state
     private bool   _isIdentifying    = false;
     private bool   _isAcrSettingsOpen = false;
@@ -187,6 +192,26 @@ public class MainWindowViewModel : BindableBase
         set => SetProperty(ref _isVolumeOpen, value);
     }
 
+    // --- Settings properties ---
+
+    public VideoQuality VideoQuality
+    {
+        get => _videoQuality;
+        set { if (!SetProperty(ref _videoQuality, value)) return; SaveSettings(); }
+    }
+
+    public bool AudioOnly
+    {
+        get => _audioOnly;
+        set { if (!SetProperty(ref _audioOnly, value)) return; SaveSettings(); }
+    }
+
+    public bool IsSettingsOpen
+    {
+        get => _isSettingsOpen;
+        set => SetProperty(ref _isSettingsOpen, value);
+    }
+
     // --- ACRCloud properties ---
 
     public bool IsIdentifying
@@ -265,7 +290,13 @@ public class MainWindowViewModel : BindableBase
     public VideoInfo? VideoInfo
     {
         get => _videoInfo;
-        private set { SetProperty(ref _videoInfo, value); RaisePropertyChanged(nameof(HasMetadata)); }
+        private set
+        {
+            SetProperty(ref _videoInfo, value);
+            RaisePropertyChanged(nameof(HasMetadata));
+            RaisePropertyChanged(nameof(StreamVideoLine));
+            RaisePropertyChanged(nameof(StreamAudioLine));
+        }
     }
 
     public System.Windows.Media.ImageSource? ThumbnailSource
@@ -275,6 +306,40 @@ public class MainWindowViewModel : BindableBase
     }
 
     public bool HasMetadata => _videoInfo != null;
+
+    public string StreamVideoLine
+    {
+        get
+        {
+            var v = _videoInfo;
+            if (v is null) return string.Empty;
+            var parts = new List<string>();
+            if (v.VideoHeight > 0)        parts.Add($"{v.VideoHeight}p");
+            if (v.VideoCodec is not null) parts.Add(v.VideoCodec);
+            if (v.VideoFps > 0)           parts.Add($"{v.VideoFps} fps");
+            return parts.Count > 0 ? string.Join(" · ", parts) : string.Empty;
+        }
+    }
+
+    public string StreamAudioLine
+    {
+        get
+        {
+            var v = _videoInfo;
+            if (v is null) return string.Empty;
+            var parts = new List<string>();
+            if (v.AudioBitrateKbps > 0)        parts.Add($"{v.AudioBitrateKbps} kbps");
+            if (v.AudioCodec is not null)       parts.Add(v.AudioCodec);
+            if (v.AudioSampleRateHz > 0)        parts.Add(FormatSampleRate(v.AudioSampleRateHz.Value));
+            return parts.Count > 0 ? string.Join(" · ", parts) : string.Empty;
+        }
+    }
+
+    private static string FormatSampleRate(int hz)
+    {
+        var khz = hz / 1000.0;
+        return khz == Math.Floor(khz) ? $"{(int)khz} kHz" : $"{khz:0.#} kHz";
+    }
 
     private void RaiseLookupCanExecuteChanged()
     {
@@ -334,6 +399,7 @@ public class MainWindowViewModel : BindableBase
     public DelegateCommand PreviousTrackCommand    { get; }
     public DelegateCommand<HistoryEntry> SelectHistoryEntryCommand { get; }
     public DelegateCommand<HistoryEntry> RemoveHistoryEntryCommand { get; }
+    public DelegateCommand ToggleSettingsCommand { get; }
 
     public MainWindowViewModel(IPlayerService playerService, IHistoryService historyService, IAcrCloudService acrCloudService)
     {
@@ -387,16 +453,18 @@ public class MainWindowViewModel : BindableBase
         PreviousTrackCommand  = new DelegateCommand(async () => await AdvancePlaylistAsync(-1),
                                     () => HasPlaylist && _currentPlaylistIndex > 0);
 
-        SelectHistoryEntryCommand = new DelegateCommand<HistoryEntry>(entry =>
+        SelectHistoryEntryCommand = new DelegateCommand<HistoryEntry>(async entry =>
         {
             Url = entry.Url;
             IsHistoryOpen = false;
+            await ExecutePlayAsync();
         });
         RemoveHistoryEntryCommand = new DelegateCommand<HistoryEntry>(entry =>
         {
             _historyService.Remove(entry.Url);
             HistoryEntries = [.._historyService.Entries];
         });
+        ToggleSettingsCommand = new DelegateCommand(() => IsSettingsOpen = !IsSettingsOpen);
 
         // All handlers use BeginInvoke (async) — never blocks the VLC internal thread.
         MediaPlayer.Playing += (_, _) =>
@@ -512,6 +580,8 @@ public class MainWindowViewModel : BindableBase
 
     private async Task PlaySingleAsync(string url, bool addToHistory)
     {
+        _playerService.Quality   = _videoQuality;
+        _playerService.AudioOnly = _audioOnly;
         var info = await _playerService.PlayAsync(url);
         Log($"[Play] Metadata: \"{info.Title}\" by {info.Channel}, {info.DurationMs}ms, {info.Chapters.Count} chapters");
 
@@ -864,8 +934,10 @@ public class MainWindowViewModel : BindableBase
             if (!File.Exists(SettingsPath)) return;
             var s = JsonSerializer.Deserialize<AppSettings>(File.ReadAllText(SettingsPath));
             if (s is null) return;
-            _volume = Math.Clamp(s.Volume, 0, 100);
-            _isMuted = s.IsMuted;
+            _volume       = Math.Clamp(s.Volume, 0, 100);
+            _isMuted      = s.IsMuted;
+            _videoQuality = s.Quality;
+            _audioOnly    = s.AudioOnly;
         }
         catch (Exception ex)
         {
@@ -878,7 +950,8 @@ public class MainWindowViewModel : BindableBase
         try
         {
             Directory.CreateDirectory(Path.GetDirectoryName(SettingsPath)!);
-            File.WriteAllText(SettingsPath, JsonSerializer.Serialize(new AppSettings(_volume, _isMuted)));
+            File.WriteAllText(SettingsPath, JsonSerializer.Serialize(
+                new AppSettings(_volume, _isMuted, _videoQuality, _audioOnly)));
         }
         catch (Exception ex)
         {

@@ -32,6 +32,8 @@ dotnet run --project StreamPlayer/StreamPlayer
 - **Volume control** — slider + mute toggle; setting persisted across launches
 - **History** — last 20 played URLs; click to reload, ✕ to remove individual entries
 - **ACRCloud track identification** — captures 8 s of system audio and identifies the playing track
+- **Settings** — video quality (Low 480p / High 1080p) and audio-only mode toggles via ⚙ button; takes effect on next load
+- **Stream quality display** — actual codec, resolution, fps, and audio bitrate shown in the info bar after load (e.g. `480p · VP9 · 30 fps | 128 kbps · Opus · 48 kHz`)
 - **Power saving friendly** — releases display and system wake locks when not playing
 - **Buffering feedback** — status bar shows buffering percentage during network hiccups
 
@@ -46,8 +48,9 @@ dotnet run --project StreamPlayer/StreamPlayer
 │                                                              │
 ├──────────────────────────────────────────────────────────────┤
 │  [thumbnail]  Title                       Channel · dur      │
+│               480p · VP9 · 30 fps | 128 kbps · Opus · 48 kHz│
 ├──────────────────────────────────────────────────────────────┤
-│  ⏮ ▶/⏸ ⏹ ⏭  [══|══●══|══]  § Chapter  0:12/10:23  🔊 🎵 ☰  │
+│  ⏮ ▶/⏸ ⏹ ⏭  [══|══●══|══]  § Chapter  0:12/10:23  🔊 🎵 ☰ ⚙ │
 └──────────────────────────────────────────────────────────────┘
 ```
 
@@ -66,3 +69,4 @@ dotnet run --project StreamPlayer/StreamPlayer
 - **DASH streams** — video and audio are served as separate tracks; yt-dlp resolves both and VLC stitches them via `:input-slave`
 - **Cookies** — if YouTube bot-detection triggers, export `cookies.txt` (via "Get cookies.txt LOCALLY" browser extension) to `%APPDATA%\StreamPlayer\cookies.txt`
 - **ACRCloud** — requires a free account at [acrcloud.com](https://www.acrcloud.com/); create an *Audio & Video Recognition* project to obtain credentials
+- **Bandwidth** — measured at typical YouTube streams: audio-only ≈ 0.3 Mbps · low quality (480p) ≈ 1.0 Mbps · high quality (1080p) ≈ 2.8 Mbps

@@ -12,11 +12,23 @@ public sealed class PlayerService : IPlayerService, IDisposable
     private readonly LibVLC _libVlc;
 
     public MediaPlayer MediaPlayer { get; }
+    public VideoQuality Quality { get; set; } = VideoQuality.Low;
+    public bool AudioOnly { get; set; } = false;
+
+    private string FormatString => AudioOnly
+        ? "bestaudio[ext=webm]/bestaudio/best"
+        : Quality == VideoQuality.High
+            ? "bestvideo[height<=1080]+bestaudio"
+            : "bestvideo[height<=480][fps<=30]+bestaudio[ext=webm]/bestvideo[height<=480]+bestaudio/best";
 
     public PlayerService()
     {
         Core.Initialize();
-        _libVlc = new LibVLC("--no-disable-screensaver");
+        _libVlc = new LibVLC(
+            "--no-disable-screensaver",
+            "--network-caching=8000",
+            "--live-caching=8000",
+            "--audio-resampler=soxr");
         MediaPlayer = new MediaPlayer(_libVlc);
     }
 
@@ -38,7 +50,7 @@ public sealed class PlayerService : IPlayerService, IDisposable
         Environment.GetFolderPath(Environment.SpecialFolder.ApplicationData),
         "StreamPlayer", "cookies.txt");
 
-    private static async Task<(string[] StreamUrls, VideoInfo Info)> FetchInfoAsync(string url)
+    private async Task<(string[] StreamUrls, VideoInfo Info)> FetchInfoAsync(string url)
     {
         var cookiesArg = File.Exists(CookiesPath) ? $"--cookies \"{CookiesPath}\"" : string.Empty;
 
@@ -47,7 +59,7 @@ public sealed class PlayerService : IPlayerService, IDisposable
             StartInfo = new ProcessStartInfo
             {
                 FileName = "yt-dlp",
-                Arguments = $"--js-runtimes node --remote-components ejs:github {cookiesArg} -f \"bestvideo[height<=1080]+bestaudio/best\" --dump-json --no-playlist \"{url}\"",
+                Arguments = $"--js-runtimes node --remote-components ejs:github {cookiesArg} -f \"{FormatString}\" --dump-json --no-playlist \"{url}\"",
                 RedirectStandardOutput = true,
                 RedirectStandardError = true,
                 UseShellExecute = false,
@@ -98,26 +110,49 @@ public sealed class PlayerService : IPlayerService, IDisposable
             }
         }
 
-        var info = new VideoInfo(title, channel, thumb, durMs, chapters);
-
-        // --- Stream URLs ---
+        // --- Stream URLs + quality ---
         string[] streamUrls;
+        int? videoHeight = null, videoFps = null, audioBitrateKbps = null, audioSampleRateHz = null;
+        string? videoCodec = null, audioCodec = null;
 
         // DASH: requested_formats has separate video + audio entries
         if (root.TryGetProperty("requested_formats", out var fmts) &&
             fmts.ValueKind == JsonValueKind.Array)
         {
-            streamUrls = fmts.EnumerateArray()
+            var fmtList = fmts.EnumerateArray().ToList();
+            streamUrls = fmtList
                 .Select(f => f.TryGetProperty("url", out var fu) ? fu.GetString() : null)
-                .Where(u => u != null)
-                .Select(u => u!)
-                .ToArray();
+                .Where(u => u != null).Select(u => u!).ToArray();
+
+            var videoFmt = fmtList.FirstOrDefault(f =>
+                f.TryGetProperty("vcodec", out var vc) && vc.GetString() is { } s && s != "none");
+            var audioFmt = fmtList.FirstOrDefault(f =>
+                f.TryGetProperty("acodec", out var ac) && ac.GetString() is { } s && s != "none");
+
+            if (videoFmt.ValueKind != JsonValueKind.Undefined)
+            {
+                if (videoFmt.TryGetProperty("height", out var vh) && vh.ValueKind == JsonValueKind.Number) videoHeight = vh.GetInt32();
+                if (videoFmt.TryGetProperty("fps",    out var vf) && vf.ValueKind == JsonValueKind.Number) videoFps    = (int)Math.Round(vf.GetDouble());
+                if (videoFmt.TryGetProperty("vcodec", out var vc) && vc.ValueKind == JsonValueKind.String) videoCodec  = NormalizeCodec(vc.GetString());
+            }
+            if (audioFmt.ValueKind != JsonValueKind.Undefined)
+            {
+                if (audioFmt.TryGetProperty("abr",   out var ab) && ab.ValueKind == JsonValueKind.Number) audioBitrateKbps = (int)Math.Round(ab.GetDouble());
+                if (audioFmt.TryGetProperty("acodec", out var ac) && ac.ValueKind == JsonValueKind.String) audioCodec       = NormalizeCodec(ac.GetString());
+                if (audioFmt.TryGetProperty("asr",   out var sr) && sr.ValueKind == JsonValueKind.Number) audioSampleRateHz = sr.GetInt32();
+            }
         }
         // Single progressive stream
         else if (root.TryGetProperty("url", out var urlProp) &&
                  urlProp.GetString() is { Length: > 0 } singleUrl)
         {
             streamUrls = [singleUrl];
+            if (root.TryGetProperty("height", out var vh) && vh.ValueKind == JsonValueKind.Number) videoHeight = vh.GetInt32();
+            if (root.TryGetProperty("fps",    out var vf) && vf.ValueKind == JsonValueKind.Number) videoFps    = (int)Math.Round(vf.GetDouble());
+            if (root.TryGetProperty("vcodec", out var vc) && vc.ValueKind == JsonValueKind.String) videoCodec  = NormalizeCodec(vc.GetString());
+            if (root.TryGetProperty("abr",    out var ab) && ab.ValueKind == JsonValueKind.Number) audioBitrateKbps = (int)Math.Round(ab.GetDouble());
+            if (root.TryGetProperty("acodec", out var ac) && ac.ValueKind == JsonValueKind.String) audioCodec       = NormalizeCodec(ac.GetString());
+            if (root.TryGetProperty("asr",    out var sr) && sr.ValueKind == JsonValueKind.Number) audioSampleRateHz = sr.GetInt32();
         }
         else
         {
@@ -127,7 +162,25 @@ public sealed class PlayerService : IPlayerService, IDisposable
         if (streamUrls.Length == 0)
             throw new InvalidOperationException("yt-dlp returned no stream URLs.");
 
+        var info = new VideoInfo(title, channel, thumb, durMs, chapters,
+            videoHeight, videoFps, videoCodec,
+            audioBitrateKbps, audioCodec, audioSampleRateHz);
+
         return (streamUrls, info);
+    }
+
+    private static string? NormalizeCodec(string? codec)
+    {
+        if (string.IsNullOrEmpty(codec) || codec == "none") return null;
+        if (codec.StartsWith("avc1",   StringComparison.OrdinalIgnoreCase)) return "H.264";
+        if (codec.StartsWith("vp9",    StringComparison.OrdinalIgnoreCase)) return "VP9";
+        if (codec.StartsWith("av01",   StringComparison.OrdinalIgnoreCase)) return "AV1";
+        if (codec.StartsWith("hev1",   StringComparison.OrdinalIgnoreCase)) return "H.265";
+        if (codec.StartsWith("hvc1",   StringComparison.OrdinalIgnoreCase)) return "H.265";
+        if (codec.StartsWith("opus",   StringComparison.OrdinalIgnoreCase)) return "Opus";
+        if (codec.StartsWith("mp4a",   StringComparison.OrdinalIgnoreCase)) return "AAC";
+        if (codec.StartsWith("vorbis", StringComparison.OrdinalIgnoreCase)) return "Vorbis";
+        return codec.Split('.')[0].ToUpperInvariant();
     }
 
     public async Task<IReadOnlyList<PlaylistEntry>> GetPlaylistEntriesAsync(string url)
