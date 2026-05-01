@@ -588,13 +588,15 @@ public class MainWindowViewModel : BindableBase
         VideoInfo = info;
         CurrentChapterTitle = string.Empty;
 
-        if (!string.IsNullOrEmpty(info.ThumbnailUrl))
+        if (!string.IsNullOrEmpty(info.ThumbnailUrl) &&
+            Uri.TryCreate(info.ThumbnailUrl, UriKind.Absolute, out var thumbUri) &&
+            thumbUri.Scheme is "http" or "https")
         {
             try
             {
                 var bmp = new System.Windows.Media.Imaging.BitmapImage();
                 bmp.BeginInit();
-                bmp.UriSource = new Uri(info.ThumbnailUrl);
+                bmp.UriSource = thumbUri;
                 bmp.EndInit();
                 ThumbnailSource = bmp;
             }

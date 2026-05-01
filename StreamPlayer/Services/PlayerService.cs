@@ -37,7 +37,9 @@ public sealed class PlayerService : IPlayerService, IDisposable
         var (streamUrls, info) = await FetchInfoAsync(url);
 
         var media = new Media(_libVlc, new Uri(streamUrls[0]));
-        if (streamUrls.Length >= 2)
+        if (streamUrls.Length >= 2 &&
+            Uri.TryCreate(streamUrls[1], UriKind.Absolute, out var slaveUri) &&
+            slaveUri.Scheme is "http" or "https")
             media.AddOption($":input-slave={streamUrls[1]}");
 
         MediaPlayer.Play(media);
