@@ -965,9 +965,12 @@ public class MainWindowViewModel : BindableBase
 
     [DllImport("kernel32.dll")]
     private static extern uint SetThreadExecutionState(uint esFlags);
-    private const uint ES_CONTINUOUS      = 0x80000000;
-    private const uint ES_SYSTEM_REQUIRED = 0x00000001;
+    private const uint ES_CONTINUOUS       = 0x80000000;
+    private const uint ES_SYSTEM_REQUIRED  = 0x00000001;
+    private const uint ES_DISPLAY_REQUIRED = 0x00000002;
 
     private static void KeepSystemAwake(bool awake) =>
-        SetThreadExecutionState(awake ? ES_CONTINUOUS | ES_SYSTEM_REQUIRED : ES_CONTINUOUS);
+        SetThreadExecutionState(awake
+            ? ES_CONTINUOUS | ES_SYSTEM_REQUIRED | ES_DISPLAY_REQUIRED
+            : ES_CONTINUOUS);
 }

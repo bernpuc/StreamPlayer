@@ -116,7 +116,7 @@ public class AcrCloudService : IAcrCloudService
         content.Add(new StringContent(wavBytes.Length.ToString()), "sample_bytes");
         content.Add(new ByteArrayContent(wavBytes), "sample", "sample.wav");
 
-        var url = $"http://{s.Host}/v1/identify";
+        var url = $"https://{s.Host}/v1/identify";
         using var response = await Http.PostAsync(url, content);
         var json = await response.Content.ReadAsStringAsync();
 

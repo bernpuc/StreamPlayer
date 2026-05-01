@@ -52,20 +52,26 @@ public sealed class PlayerService : IPlayerService, IDisposable
 
     private async Task<(string[] StreamUrls, VideoInfo Info)> FetchInfoAsync(string url)
     {
-        var cookiesArg = File.Exists(CookiesPath) ? $"--cookies \"{CookiesPath}\"" : string.Empty;
-
-        using var process = new Process
+        var psi = new ProcessStartInfo
         {
-            StartInfo = new ProcessStartInfo
-            {
-                FileName = "yt-dlp",
-                Arguments = $"--js-runtimes node --remote-components ejs:github {cookiesArg} -f \"{FormatString}\" --dump-json --no-playlist \"{url}\"",
-                RedirectStandardOutput = true,
-                RedirectStandardError = true,
-                UseShellExecute = false,
-                CreateNoWindow = true
-            }
+            FileName = "yt-dlp",
+            RedirectStandardOutput = true,
+            RedirectStandardError = true,
+            UseShellExecute = false,
+            CreateNoWindow = true
         };
+        psi.ArgumentList.Add("--js-runtimes");
+        psi.ArgumentList.Add("node");
+        psi.ArgumentList.Add("--remote-components");
+        psi.ArgumentList.Add("ejs:github");
+        if (File.Exists(CookiesPath)) { psi.ArgumentList.Add("--cookies"); psi.ArgumentList.Add(CookiesPath); }
+        psi.ArgumentList.Add("-f");
+        psi.ArgumentList.Add(FormatString);
+        psi.ArgumentList.Add("--dump-json");
+        psi.ArgumentList.Add("--no-playlist");
+        psi.ArgumentList.Add(url);
+
+        using var process = new Process { StartInfo = psi };
 
         process.Start();
 
@@ -185,20 +191,25 @@ public sealed class PlayerService : IPlayerService, IDisposable
 
     public async Task<IReadOnlyList<PlaylistEntry>> GetPlaylistEntriesAsync(string url)
     {
-        var cookiesArg = File.Exists(CookiesPath) ? $"--cookies \"{CookiesPath}\"" : string.Empty;
-
-        using var process = new Process
+        var psi = new ProcessStartInfo
         {
-            StartInfo = new ProcessStartInfo
-            {
-                FileName = "yt-dlp",
-                Arguments = $"--js-runtimes node --remote-components ejs:github {cookiesArg} --flat-playlist --yes-playlist --dump-json \"{url}\"",
-                RedirectStandardOutput = true,
-                RedirectStandardError = true,
-                UseShellExecute = false,
-                CreateNoWindow = true
-            }
+            FileName = "yt-dlp",
+            RedirectStandardOutput = true,
+            RedirectStandardError = true,
+            UseShellExecute = false,
+            CreateNoWindow = true
         };
+        psi.ArgumentList.Add("--js-runtimes");
+        psi.ArgumentList.Add("node");
+        psi.ArgumentList.Add("--remote-components");
+        psi.ArgumentList.Add("ejs:github");
+        if (File.Exists(CookiesPath)) { psi.ArgumentList.Add("--cookies"); psi.ArgumentList.Add(CookiesPath); }
+        psi.ArgumentList.Add("--flat-playlist");
+        psi.ArgumentList.Add("--yes-playlist");
+        psi.ArgumentList.Add("--dump-json");
+        psi.ArgumentList.Add(url);
+
+        using var process = new Process { StartInfo = psi };
 
         process.Start();
 
