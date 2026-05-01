@@ -803,6 +803,15 @@
                                           Foreground="White" FontSize="12"
                                           IsChecked="{Binding AudioOnly}"
                                           Margin="0,0,0,10"/>
+                                <Separator Background="#444" Margin="0,0,0,10"/>
+                                <TextBlock Text="SECURITY"
+                                           Foreground="#777" FontSize="10" FontFamily="Consolas"
+                                           Margin="0,0,0,6"/>
+                                <CheckBox Content="JS challenge solver (YouTube)"
+                                          Foreground="White" FontSize="12"
+                                          IsChecked="{Binding UseRemoteComponents}"
+                                          Margin="0,0,0,4"
+                                          ToolTip="Downloads unverified JS from GitHub at runtime to solve YouTube bot-checks. Disable if you don't need YouTube support."/>
                                 <TextBlock Text="Takes effect on next load"
                                            Foreground="#555" FontSize="10" FontStyle="Italic"/>
                             </StackPanel>

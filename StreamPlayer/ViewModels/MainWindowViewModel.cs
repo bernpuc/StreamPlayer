@@ -52,6 +52,7 @@ public class MainWindowViewModel : BindableBase
     // Settings panel state
     private VideoQuality _videoQuality = VideoQuality.Low;
     private bool _audioOnly = false;
+    private bool _useRemoteComponents = true;
     private bool _isSettingsOpen = false;
 
     // ACRCloud state
@@ -204,6 +205,12 @@ public class MainWindowViewModel : BindableBase
     {
         get => _audioOnly;
         set { if (!SetProperty(ref _audioOnly, value)) return; SaveSettings(); }
+    }
+
+    public bool UseRemoteComponents
+    {
+        get => _useRemoteComponents;
+        set { if (!SetProperty(ref _useRemoteComponents, value)) return; SaveSettings(); }
     }
 
     public bool IsSettingsOpen
@@ -580,8 +587,9 @@ public class MainWindowViewModel : BindableBase
 
     private async Task PlaySingleAsync(string url, bool addToHistory)
     {
-        _playerService.Quality   = _videoQuality;
-        _playerService.AudioOnly = _audioOnly;
+        _playerService.Quality              = _videoQuality;
+        _playerService.AudioOnly            = _audioOnly;
+        _playerService.UseRemoteComponents  = _useRemoteComponents;
         var info = await _playerService.PlayAsync(url);
         Log($"[Play] Metadata: \"{info.Title}\" by {info.Channel}, {info.DurationMs}ms, {info.Chapters.Count} chapters");
 
@@ -936,10 +944,11 @@ public class MainWindowViewModel : BindableBase
             if (!File.Exists(SettingsPath)) return;
             var s = JsonSerializer.Deserialize<AppSettings>(File.ReadAllText(SettingsPath));
             if (s is null) return;
-            _volume       = Math.Clamp(s.Volume, 0, 100);
-            _isMuted      = s.IsMuted;
-            _videoQuality = s.Quality;
-            _audioOnly    = s.AudioOnly;
+            _volume               = Math.Clamp(s.Volume, 0, 100);
+            _isMuted              = s.IsMuted;
+            _videoQuality         = s.Quality;
+            _audioOnly            = s.AudioOnly;
+            _useRemoteComponents  = s.UseRemoteComponents;
         }
         catch (Exception ex)
         {
@@ -953,7 +962,7 @@ public class MainWindowViewModel : BindableBase
         {
             Directory.CreateDirectory(Path.GetDirectoryName(SettingsPath)!);
             File.WriteAllText(SettingsPath, JsonSerializer.Serialize(
-                new AppSettings(_volume, _isMuted, _videoQuality, _audioOnly)));
+                new AppSettings(_volume, _isMuted, _videoQuality, _audioOnly, _useRemoteComponents)));
         }
         catch (Exception ex)
         {

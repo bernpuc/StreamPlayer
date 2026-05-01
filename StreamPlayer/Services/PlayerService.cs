@@ -14,6 +14,7 @@ public sealed class PlayerService : IPlayerService, IDisposable
     public MediaPlayer MediaPlayer { get; }
     public VideoQuality Quality { get; set; } = VideoQuality.Low;
     public bool AudioOnly { get; set; } = false;
+    public bool UseRemoteComponents { get; set; } = true;
 
     private string FormatString => AudioOnly
         ? "bestaudio[ext=webm]/bestaudio/best"
@@ -62,10 +63,15 @@ public sealed class PlayerService : IPlayerService, IDisposable
             UseShellExecute = false,
             CreateNoWindow = true
         };
-        psi.ArgumentList.Add("--js-runtimes");
-        psi.ArgumentList.Add("node");
-        psi.ArgumentList.Add("--remote-components");
-        psi.ArgumentList.Add("ejs:github");
+        psi.ArgumentList.Add("--no-config");
+        psi.ArgumentList.Add("--no-plugins");
+        if (UseRemoteComponents)
+        {
+            psi.ArgumentList.Add("--js-runtimes");
+            psi.ArgumentList.Add("node");
+            psi.ArgumentList.Add("--remote-components");
+            psi.ArgumentList.Add("ejs:github");
+        }
         if (File.Exists(CookiesPath)) { psi.ArgumentList.Add("--cookies"); psi.ArgumentList.Add(CookiesPath); }
         psi.ArgumentList.Add("-f");
         psi.ArgumentList.Add(FormatString);
@@ -201,10 +207,15 @@ public sealed class PlayerService : IPlayerService, IDisposable
             UseShellExecute = false,
             CreateNoWindow = true
         };
-        psi.ArgumentList.Add("--js-runtimes");
-        psi.ArgumentList.Add("node");
-        psi.ArgumentList.Add("--remote-components");
-        psi.ArgumentList.Add("ejs:github");
+        psi.ArgumentList.Add("--no-config");
+        psi.ArgumentList.Add("--no-plugins");
+        if (UseRemoteComponents)
+        {
+            psi.ArgumentList.Add("--js-runtimes");
+            psi.ArgumentList.Add("node");
+            psi.ArgumentList.Add("--remote-components");
+            psi.ArgumentList.Add("ejs:github");
+        }
         if (File.Exists(CookiesPath)) { psi.ArgumentList.Add("--cookies"); psi.ArgumentList.Add(CookiesPath); }
         psi.ArgumentList.Add("--flat-playlist");
         psi.ArgumentList.Add("--yes-playlist");
