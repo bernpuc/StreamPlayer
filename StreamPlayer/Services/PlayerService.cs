@@ -64,7 +64,6 @@ public sealed class PlayerService : IPlayerService, IDisposable
             CreateNoWindow = true
         };
         psi.ArgumentList.Add("--no-config");
-        psi.ArgumentList.Add("--no-plugins");
         if (UseRemoteComponents)
         {
             psi.ArgumentList.Add("--js-runtimes");
@@ -208,7 +207,6 @@ public sealed class PlayerService : IPlayerService, IDisposable
             CreateNoWindow = true
         };
         psi.ArgumentList.Add("--no-config");
-        psi.ArgumentList.Add("--no-plugins");
         if (UseRemoteComponents)
         {
             psi.ArgumentList.Add("--js-runtimes");
