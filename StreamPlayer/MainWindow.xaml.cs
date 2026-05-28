@@ -30,6 +30,7 @@ public partial class MainWindow : Window
 
             PlaylistList.SelectionChanged += (_, _) =>
             {
+                if (_syncingPlaylist) return;
                 if (PlaylistList.SelectedItem is PlaylistEntry entry)
                     viewModel.SelectPlaylistEntry(entry);
             };
@@ -53,11 +54,15 @@ public partial class MainWindow : Window
         };
     }
 
+    private bool _syncingPlaylist;
+
     private void SyncPlaylistSelection(int idx)
     {
+        _syncingPlaylist = true;
         PlaylistList.SelectedIndex = idx;
         if (idx >= 0 && idx < PlaylistList.Items.Count)
             PlaylistList.ScrollIntoView(PlaylistList.Items[idx]);
+        _syncingPlaylist = false;
     }
 
     private void ApplyVideoInfo(VideoInfo? info)
