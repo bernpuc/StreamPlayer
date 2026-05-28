@@ -70,7 +70,6 @@ public class MainWindowViewModel : BindableBase
     private bool _isPlaylistOpen;
     private ObservableCollection<PlaylistEntry> _playlistEntries = new();
 
-    private const long SeekStepMs = 10_000;
 
     private static readonly string SettingsPath = Path.Combine(
         Environment.GetFolderPath(Environment.SpecialFolder.ApplicationData),
@@ -288,6 +287,8 @@ public class MainWindowViewModel : BindableBase
             RaisePropertyChanged(nameof(CurrentTrackLabel));
             NextTrackCommand.RaiseCanExecuteChanged();
             PreviousTrackCommand.RaiseCanExecuteChanged();
+            RewindCommand.RaiseCanExecuteChanged();
+            FastForwardCommand.RaiseCanExecuteChanged();
         }
     }
 
@@ -307,6 +308,8 @@ public class MainWindowViewModel : BindableBase
             RaisePropertyChanged(nameof(StreamAudioLine));
             NextTrackCommand?.RaiseCanExecuteChanged();
             PreviousTrackCommand?.RaiseCanExecuteChanged();
+            RewindCommand?.RaiseCanExecuteChanged();
+            FastForwardCommand?.RaiseCanExecuteChanged();
         }
     }
 
@@ -430,8 +433,8 @@ public class MainWindowViewModel : BindableBase
         PlayCommand           = new DelegateCommand(async () => await ExecutePlayAsync(), () => IsValidUrl && !IsLoading);
         PauseResumeCommand    = new DelegateCommand(ExecutePauseResume, () => CanControl);
         StopCommand           = new DelegateCommand(ExecuteStop,        () => CanControl);
-        RewindCommand         = new DelegateCommand(ExecuteRewind,      () => CanControl);
-        FastForwardCommand    = new DelegateCommand(ExecuteFastForward, () => CanControl);
+        RewindCommand         = new DelegateCommand(async () => await AdvanceTrackAsync(-1), () => CanAdvanceTrack(-1));
+        FastForwardCommand    = new DelegateCommand(async () => await AdvanceTrackAsync(+1), () => CanAdvanceTrack(+1));
         ToggleHistoryCommand  = new DelegateCommand(() => IsHistoryOpen = !IsHistoryOpen);
         ToggleVolumeCommand   = new DelegateCommand(() => IsVolumeOpen = !IsVolumeOpen);
         ToggleMuteCommand     = new DelegateCommand(() => IsMuted = !IsMuted);
@@ -768,6 +771,8 @@ public class MainWindowViewModel : BindableBase
         RaisePropertyChanged(nameof(CurrentPlaylistIndex));
         NextTrackCommand?.RaiseCanExecuteChanged();
         PreviousTrackCommand?.RaiseCanExecuteChanged();
+        RewindCommand?.RaiseCanExecuteChanged();
+        FastForwardCommand?.RaiseCanExecuteChanged();
     }
 
     private static string? ExtractVideoId(string url)
@@ -790,24 +795,6 @@ public class MainWindowViewModel : BindableBase
     {
         Log("[Stop] Calling MediaPlayer.Stop()");
         MediaPlayer.Stop();
-    }
-
-    private void ExecuteRewind()
-    {
-        if (_duration <= 0) return;
-        long before = MediaPlayer.Time;
-        long target = Math.Max(0, before - SeekStepMs);
-        Log($"[Rewind] {FormatMs(before)} → {FormatMs(target)}");
-        MediaPlayer.Position = (float)target / _duration;
-    }
-
-    private void ExecuteFastForward()
-    {
-        if (_duration <= 0) return;
-        long before = MediaPlayer.Time;
-        long target = Math.Min(_duration, before + SeekStepMs);
-        Log($"[FastForward] {FormatMs(before)} → {FormatMs(target)}");
-        MediaPlayer.Position = (float)target / _duration;
     }
 
     // --- Artist lookup commands ---

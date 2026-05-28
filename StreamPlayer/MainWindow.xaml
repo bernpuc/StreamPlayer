@@ -378,7 +378,7 @@
                 <StackPanel Grid.Column="0" Orientation="Horizontal" VerticalAlignment="Center"
                             Margin="0,0,8,0">
                     <Button Command="{Binding RewindCommand}"
-                            Style="{StaticResource TransportButton}" ToolTip="-10 seconds">
+                            Style="{StaticResource TransportButton}" ToolTip="Previous chapter / track">
                         <TextBlock Text="⏮" FontSize="18"/>
                     </Button>
                     <Button Command="{Binding PauseResumeCommand}"
@@ -403,7 +403,7 @@
                         <TextBlock Text="⏹" FontSize="18"/>
                     </Button>
                     <Button Command="{Binding FastForwardCommand}"
-                            Style="{StaticResource TransportButton}" ToolTip="+10 seconds">
+                            Style="{StaticResource TransportButton}" ToolTip="Next chapter / track">
                         <TextBlock Text="⏭" FontSize="18"/>
                     </Button>
                 </StackPanel>
