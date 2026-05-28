@@ -122,7 +122,6 @@ public class MainWindowViewModel : BindableBase
         {
             SetProperty(ref _canControl, value);
             PauseResumeCommand.RaiseCanExecuteChanged();
-            StopCommand.RaiseCanExecuteChanged();
             RewindCommand.RaiseCanExecuteChanged();
             FastForwardCommand.RaiseCanExecuteChanged();
             IdentifyCommand?.RaiseCanExecuteChanged();
@@ -400,7 +399,6 @@ public class MainWindowViewModel : BindableBase
 
     public DelegateCommand PlayCommand        { get; }
     public DelegateCommand PauseResumeCommand { get; }
-    public DelegateCommand StopCommand        { get; }
     public DelegateCommand RewindCommand      { get; }
     public DelegateCommand FastForwardCommand { get; }
     public DelegateCommand ToggleHistoryCommand { get; }
@@ -432,7 +430,6 @@ public class MainWindowViewModel : BindableBase
 
         PlayCommand           = new DelegateCommand(async () => await ExecutePlayAsync(), () => IsValidUrl && !IsLoading);
         PauseResumeCommand    = new DelegateCommand(ExecutePauseResume, () => CanControl);
-        StopCommand           = new DelegateCommand(ExecuteStop,        () => CanControl);
         RewindCommand         = new DelegateCommand(async () => await AdvanceTrackAsync(-1), () => CanAdvanceTrack(-1));
         FastForwardCommand    = new DelegateCommand(async () => await AdvanceTrackAsync(+1), () => CanAdvanceTrack(+1));
         ToggleHistoryCommand  = new DelegateCommand(() => IsHistoryOpen = !IsHistoryOpen);
@@ -791,11 +788,6 @@ public class MainWindowViewModel : BindableBase
         MediaPlayer.SetPause(pausing);
     }
 
-    private void ExecuteStop()
-    {
-        Log("[Stop] Calling MediaPlayer.Stop()");
-        MediaPlayer.Stop();
-    }
 
     // --- Artist lookup commands ---
 

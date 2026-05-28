@@ -398,10 +398,6 @@
                             </TextBlock>
                         </Button.Content>
                     </Button>
-                    <Button Command="{Binding StopCommand}"
-                            Style="{StaticResource TransportButton}" Margin="2,0" ToolTip="Stop">
-                        <TextBlock Text="⏹" FontSize="18"/>
-                    </Button>
                     <Button Command="{Binding FastForwardCommand}"
                             Style="{StaticResource TransportButton}" ToolTip="Next chapter / track">
                         <TextBlock Text="⏭" FontSize="18"/>
