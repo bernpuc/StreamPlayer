@@ -729,6 +729,7 @@ public class MainWindowViewModel : BindableBase
 
     public void SelectPlaylistEntry(PlaylistEntry entry)
     {
+        if (entry.Index == _currentPlaylistIndex) return;
         CurrentPlaylistIndex = entry.Index;
         IsPlaylistOpen = false;
         _ = PlayAtCurrentIndexAsync();
