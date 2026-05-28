@@ -305,6 +305,8 @@ public class MainWindowViewModel : BindableBase
             RaisePropertyChanged(nameof(HasMetadata));
             RaisePropertyChanged(nameof(StreamVideoLine));
             RaisePropertyChanged(nameof(StreamAudioLine));
+            NextTrackCommand?.RaiseCanExecuteChanged();
+            PreviousTrackCommand?.RaiseCanExecuteChanged();
         }
     }
 
@@ -465,10 +467,10 @@ public class MainWindowViewModel : BindableBase
         CloseAcrSettingsCommand = new DelegateCommand(() => IsAcrSettingsOpen = false);
 
         TogglePlaylistCommand = new DelegateCommand(() => IsPlaylistOpen = !IsPlaylistOpen, () => HasPlaylist);
-        NextTrackCommand      = new DelegateCommand(async () => await AdvancePlaylistAsync(+1),
-                                    () => HasPlaylist && _currentPlaylistIndex < _playlist.Count - 1);
-        PreviousTrackCommand  = new DelegateCommand(async () => await AdvancePlaylistAsync(-1),
-                                    () => HasPlaylist && _currentPlaylistIndex > 0);
+        NextTrackCommand      = new DelegateCommand(async () => await AdvanceTrackAsync(+1),
+                                    () => CanAdvanceTrack(+1));
+        PreviousTrackCommand  = new DelegateCommand(async () => await AdvanceTrackAsync(-1),
+                                    () => CanAdvanceTrack(-1));
 
         SelectHistoryEntryCommand = new DelegateCommand<HistoryEntry>(async entry =>
         {
@@ -677,6 +679,46 @@ public class MainWindowViewModel : BindableBase
                 Log($"[Playlist] Background fetch failed: {ex.Message}");
             }
         });
+    }
+
+    private bool CanAdvanceTrack(int delta)
+    {
+        if (HasPlaylist)
+        {
+            int next = _currentPlaylistIndex + delta;
+            return next >= 0 && next < _playlist.Count;
+        }
+        if (_videoInfo?.Chapters.Count > 0)
+        {
+            int idx = CurrentChapterIndex();
+            int next = idx + delta;
+            return next >= 0 && next < _videoInfo.Chapters.Count;
+        }
+        return false;
+    }
+
+    private async Task AdvanceTrackAsync(int delta)
+    {
+        if (HasPlaylist)
+        {
+            await AdvancePlaylistAsync(delta);
+            return;
+        }
+        if (_videoInfo?.Chapters.Count > 0 && _duration > 0)
+        {
+            int next = CurrentChapterIndex() + delta;
+            if (next < 0 || next >= _videoInfo.Chapters.Count) return;
+            MediaPlayer.Position = (float)_videoInfo.Chapters[next].StartMs / _duration;
+        }
+    }
+
+    private int CurrentChapterIndex()
+    {
+        if (_videoInfo is null) return -1;
+        long timeMs = MediaPlayer.Time;
+        for (int i = _videoInfo.Chapters.Count - 1; i >= 0; i--)
+            if (timeMs >= _videoInfo.Chapters[i].StartMs) return i;
+        return 0;
     }
 
     private async Task AdvancePlaylistAsync(int delta)
