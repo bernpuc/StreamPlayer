@@ -17,6 +17,7 @@ public class MainWindowViewModel : BindableBase
     private readonly IPlayerService _playerService;
     private readonly IHistoryService _historyService;
     private readonly IAcrCloudService _acrCloudService;
+    private readonly ISmtcService _smtcService;
 
     // URL bar state
     private string _url = string.Empty;
@@ -39,6 +40,7 @@ public class MainWindowViewModel : BindableBase
     private string _chapterArtist       = string.Empty;
     private string _chapterSong         = string.Empty;
     private System.Windows.Media.ImageSource? _thumbnailSource;
+    private string _windowTitle = "StreamPlayer";
 
     // History state
     private IReadOnlyList<HistoryEntry> _historyEntries = [];
@@ -362,6 +364,7 @@ public class MainWindowViewModel : BindableBase
         {
             if (!SetProperty(ref _currentChapterTitle, value)) return;
             ParseChapterTitle(value);
+            PushSmtcMetadata(_isPlaying);
         }
     }
 
@@ -379,6 +382,12 @@ public class MainWindowViewModel : BindableBase
 
     public bool HasChapterArtist => !string.IsNullOrEmpty(_chapterArtist);
     public bool HasChapterSong   => !string.IsNullOrEmpty(_chapterSong);
+
+    public string WindowTitle
+    {
+        get => _windowTitle;
+        private set => SetProperty(ref _windowTitle, value);
+    }
 
     public MediaPlayer MediaPlayer => _playerService.MediaPlayer;
 
@@ -408,11 +417,12 @@ public class MainWindowViewModel : BindableBase
     public DelegateCommand<HistoryEntry> RemoveHistoryEntryCommand { get; }
     public DelegateCommand ToggleSettingsCommand { get; }
 
-    public MainWindowViewModel(IPlayerService playerService, IHistoryService historyService, IAcrCloudService acrCloudService)
+    public MainWindowViewModel(IPlayerService playerService, IHistoryService historyService, IAcrCloudService acrCloudService, ISmtcService smtcService)
     {
         _playerService    = playerService;
         _historyService   = historyService;
         _acrCloudService  = acrCloudService;
+        _smtcService      = smtcService;
         _historyEntries   = [.._historyService.Entries];
 
         PlayCommand           = new DelegateCommand(async () => await ExecutePlayAsync(), () => IsValidUrl && !IsLoading);
@@ -473,24 +483,28 @@ public class MainWindowViewModel : BindableBase
         });
         ToggleSettingsCommand = new DelegateCommand(() => IsSettingsOpen = !IsSettingsOpen);
 
+        _smtcService.PlayPausePressed += (_, _) => Dispatch(() => { if (PauseResumeCommand.CanExecute()) PauseResumeCommand.Execute(); });
+        _smtcService.NextPressed      += (_, _) => Dispatch(() => { if (NextTrackCommand.CanExecute()) NextTrackCommand.Execute(); });
+        _smtcService.PreviousPressed  += (_, _) => Dispatch(() => { if (PreviousTrackCommand.CanExecute()) PreviousTrackCommand.Execute(); });
+
         // All handlers use BeginInvoke (async) — never blocks the VLC internal thread.
         MediaPlayer.Playing += (_, _) =>
         {
             Log("[VLC] Playing");
             KeepSystemAwake(true);
-            Dispatch(() => { IsPlaying = true; CanControl = true; StatusMessage = string.Empty; });
+            Dispatch(() => { IsPlaying = true; CanControl = true; StatusMessage = string.Empty; PushSmtcMetadata(true); });
         };
         MediaPlayer.Paused += (_, _) =>
         {
             Log("[VLC] Paused");
             KeepSystemAwake(false);
-            Dispatch(() => IsPlaying = false);
+            Dispatch(() => { IsPlaying = false; PushSmtcMetadata(false); });
         };
         MediaPlayer.Stopped += (_, _) =>
         {
             Log("[VLC] Stopped");
             KeepSystemAwake(false);
-            Dispatch(() => { IsPlaying = false; CanControl = false; ResetPlayback(); StatusMessage = string.Empty; });
+            Dispatch(() => { IsPlaying = false; CanControl = false; ResetPlayback(); StatusMessage = string.Empty; _smtcService.UpdateStopped(); });
         };
         MediaPlayer.EndReached += (_, _) =>
         {
@@ -595,6 +609,7 @@ public class MainWindowViewModel : BindableBase
 
         VideoInfo = info;
         CurrentChapterTitle = string.Empty;
+        WindowTitle = $"{info.Channel} - {info.Title}";
 
         if (!string.IsNullOrEmpty(info.ThumbnailUrl) &&
             Uri.TryCreate(info.ThumbnailUrl, UriKind.Absolute, out var thumbUri) &&
@@ -786,6 +801,9 @@ public class MainWindowViewModel : BindableBase
             ChapterArtist = string.Empty;
             ChapterSong   = string.Empty;
             RaiseChapterCommandsCanExecuteChanged();
+            // Revert to video-level title/channel
+            if (_videoInfo is not null)
+                WindowTitle = $"{_videoInfo.Channel} - {_videoInfo.Title}";
             return;
         }
 
@@ -799,14 +817,17 @@ public class MainWindowViewModel : BindableBase
                 ChapterArtist = title[..idx].Trim();
                 ChapterSong   = StripLabel(title[(idx + sep.Length)..].Trim());
                 RaiseChapterCommandsCanExecuteChanged();
+                WindowTitle = $"{_chapterArtist} - {_chapterSong}";
                 return;
             }
         }
 
-        // No separator — treat full title as the song, no artist
+        // No separator — treat full title as the song; use channel as artist
         ChapterArtist = string.Empty;
         ChapterSong   = StripLabel(title.Trim());
         RaiseChapterCommandsCanExecuteChanged();
+        var fallbackArtist = _videoInfo?.Channel ?? string.Empty;
+        WindowTitle = string.IsNullOrEmpty(fallbackArtist) ? _chapterSong : $"{fallbackArtist} - {_chapterSong}";
     }
 
     // Strips trailing [Label] or (Label) from a song title.
@@ -871,6 +892,18 @@ public class MainWindowViewModel : BindableBase
         IsHistoryOpen = false;
     }
 
+    // --- SMTC helpers (called from code-behind) ---
+
+    public void InitializeSmtc(IntPtr hwnd) => _smtcService.Initialize(hwnd);
+
+    private void PushSmtcMetadata(bool isPlaying)
+    {
+        if (_videoInfo is null) return;
+        var title  = !string.IsNullOrEmpty(_chapterSong)   ? _chapterSong   : _videoInfo.Title;
+        var artist = !string.IsNullOrEmpty(_chapterArtist) ? _chapterArtist : _videoInfo.Channel;
+        _smtcService.UpdatePlayback(title, artist, isPlaying);
+    }
+
     // --- Seek helpers (called from code-behind) ---
 
     public void OnSeekStarted()
@@ -926,6 +959,7 @@ public class MainWindowViewModel : BindableBase
         CurrentChapterTitle = string.Empty;
         ThumbnailSource = null;
         VideoInfo = null;
+        WindowTitle = "StreamPlayer";
         RaiseLookupCanExecuteChanged();
     }
 

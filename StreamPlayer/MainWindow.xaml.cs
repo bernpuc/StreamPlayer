@@ -3,6 +3,7 @@ using StreamPlayer.ViewModels;
 using System.Windows;
 using System.Windows.Controls;
 using System.Windows.Controls.Primitives;
+using System.Windows.Interop;
 using System.Windows.Media;
 
 namespace StreamPlayer;
@@ -16,6 +17,7 @@ public partial class MainWindow : Window
 
         Loaded += (_, _) =>
         {
+            viewModel.InitializeSmtc(new WindowInteropHelper(this).Handle);
             VideoPlayer.MediaPlayer = viewModel.MediaPlayer;
 
             UrlBox.MouseEnter += (_, _) => { UrlBox.Focus(); UrlBox.SelectAll(); };

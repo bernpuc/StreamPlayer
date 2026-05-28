@@ -24,5 +24,6 @@ public partial class App : PrismApplication
         containerRegistry.RegisterSingleton<IPlayerService, PlayerService>();
         containerRegistry.RegisterSingleton<IHistoryService, HistoryService>();
         containerRegistry.RegisterSingleton<IAcrCloudService, AcrCloudService>();
+        containerRegistry.RegisterSingleton<ISmtcService, SmtcService>();
     }
 }
