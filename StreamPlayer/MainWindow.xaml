@@ -361,12 +361,15 @@
         </Border>
 
         <!-- ═══ Row 3: Transport controls ═══ -->
-        <Border Grid.Row="3" Background="#1A1A1A" Padding="10,6">
+        <Border Grid.Row="3" Background="#1A1A1A" Padding="10,6,10,6">
             <Grid>
+                <Grid.RowDefinitions>
+                    <RowDefinition Height="Auto"/>  <!-- chapter title -->
+                    <RowDefinition Height="Auto"/>  <!-- controls      -->
+                </Grid.RowDefinitions>
                 <Grid.ColumnDefinitions>
                     <ColumnDefinition Width="Auto"/>  <!-- buttons       -->
                     <ColumnDefinition Width="*"/>     <!-- seek slider   -->
-                    <ColumnDefinition Width="Auto"/>  <!-- chapter name  -->
                     <ColumnDefinition Width="Auto"/>  <!-- time display  -->
                     <ColumnDefinition Width="Auto"/>  <!-- volume        -->
                     <ColumnDefinition Width="Auto"/>  <!-- identify      -->
@@ -374,52 +377,13 @@
                     <ColumnDefinition Width="Auto"/>  <!-- settings      -->
                 </Grid.ColumnDefinitions>
 
-                <!-- Transport buttons -->
-                <StackPanel Grid.Column="0" Orientation="Horizontal" VerticalAlignment="Center"
-                            Margin="0,0,8,0">
-                    <Button Command="{Binding RewindCommand}"
-                            Style="{StaticResource TransportButton}" ToolTip="Previous chapter / track">
-                        <TextBlock Text="⏮" FontSize="18"/>
-                    </Button>
-                    <Button Command="{Binding PauseResumeCommand}"
-                            Style="{StaticResource TransportButton}" Margin="2,0" ToolTip="Pause / Resume">
-                        <Button.Content>
-                            <TextBlock FontSize="18">
-                                <TextBlock.Style>
-                                    <Style TargetType="TextBlock">
-                                        <Setter Property="Text" Value="▶"/>
-                                        <Style.Triggers>
-                                            <DataTrigger Binding="{Binding IsPlaying}" Value="True">
-                                                <Setter Property="Text" Value="⏸"/>
-                                            </DataTrigger>
-                                        </Style.Triggers>
-                                    </Style>
-                                </TextBlock.Style>
-                            </TextBlock>
-                        </Button.Content>
-                    </Button>
-                    <Button Command="{Binding FastForwardCommand}"
-                            Style="{StaticResource TransportButton}" ToolTip="Next chapter / track">
-                        <TextBlock Text="⏭" FontSize="18"/>
-                    </Button>
-                </StackPanel>
-
-                <!-- Seek slider with chapter tick marks -->
-                <Slider x:Name="SeekSlider"
-                        Grid.Column="1"
-                        Value="{Binding SliderPosition, Mode=TwoWay}"
-                        Minimum="0" Maximum="1"
-                        IsEnabled="{Binding CanControl}"
-                        VerticalAlignment="Center"
-                        Margin="4,0"/>
-
-                <!-- Current chapter name -->
-                <TextBlock Grid.Column="2"
+                <!-- Current chapter name (above seek bar) -->
+                <TextBlock Grid.Row="0" Grid.Column="0" Grid.ColumnSpan="7"
                            Text="{Binding CurrentChapterTitle}"
                            Foreground="#777" FontSize="11"
-                           VerticalAlignment="Center"
-                           MaxWidth="220" TextTrimming="CharacterEllipsis"
-                           Margin="6,0"
+                           HorizontalAlignment="Center"
+                           Margin="0,0,0,3"
+                           MaxWidth="600" TextTrimming="CharacterEllipsis"
                            ToolTip="Right-click to look up artist or song">
                     <TextBlock.Style>
                         <Style TargetType="TextBlock">
@@ -454,8 +418,47 @@
                     </TextBlock.ContextMenu>
                 </TextBlock>
 
+                <!-- Transport buttons -->
+                <StackPanel Grid.Row="1" Grid.Column="0" Orientation="Horizontal" VerticalAlignment="Center"
+                            Margin="0,0,8,0">
+                    <Button Command="{Binding RewindCommand}"
+                            Style="{StaticResource TransportButton}" ToolTip="Previous chapter / track">
+                        <TextBlock Text="⏮" FontSize="18"/>
+                    </Button>
+                    <Button Command="{Binding PauseResumeCommand}"
+                            Style="{StaticResource TransportButton}" Margin="2,0" ToolTip="Pause / Resume">
+                        <Button.Content>
+                            <TextBlock FontSize="18">
+                                <TextBlock.Style>
+                                    <Style TargetType="TextBlock">
+                                        <Setter Property="Text" Value="▶"/>
+                                        <Style.Triggers>
+                                            <DataTrigger Binding="{Binding IsPlaying}" Value="True">
+                                                <Setter Property="Text" Value="⏸"/>
+                                            </DataTrigger>
+                                        </Style.Triggers>
+                                    </Style>
+                                </TextBlock.Style>
+                            </TextBlock>
+                        </Button.Content>
+                    </Button>
+                    <Button Command="{Binding FastForwardCommand}"
+                            Style="{StaticResource TransportButton}" ToolTip="Next chapter / track">
+                        <TextBlock Text="⏭" FontSize="18"/>
+                    </Button>
+                </StackPanel>
+
+                <!-- Seek slider with chapter tick marks -->
+                <Slider x:Name="SeekSlider"
+                        Grid.Row="1" Grid.Column="1"
+                        Value="{Binding SliderPosition, Mode=TwoWay}"
+                        Minimum="0" Maximum="1"
+                        IsEnabled="{Binding CanControl}"
+                        VerticalAlignment="Center"
+                        Margin="4,0"/>
+
                 <!-- Time display -->
-                <TextBlock Grid.Column="3"
+                <TextBlock Grid.Row="1" Grid.Column="2"
                            Text="{Binding TimeDisplay}"
                            Foreground="#AAAAAA" FontSize="12"
                            VerticalAlignment="Center"
@@ -463,7 +466,7 @@
                            FontFamily="Consolas"/>
 
                 <!-- Volume button + popup -->
-                <Grid Grid.Column="4" Margin="4,0,0,0" VerticalAlignment="Center">
+                <Grid Grid.Row="1" Grid.Column="3" Margin="4,0,0,0" VerticalAlignment="Center">
                     <Button x:Name="VolumeButton"
                             Content="{Binding VolumeIcon}"
                             Command="{Binding ToggleVolumeCommand}"
@@ -510,7 +513,7 @@
                 </Grid>
 
                 <!-- Identify button + settings popup -->
-                <Grid Grid.Column="5" Margin="4,0,0,0" VerticalAlignment="Center">
+                <Grid Grid.Row="1" Grid.Column="4" Margin="4,0,0,0" VerticalAlignment="Center">
                     <Button x:Name="IdentifyButton"
                             Content="🎵"
                             Command="{Binding IdentifyCommand}"
@@ -649,7 +652,7 @@
                 </Grid>
 
                 <!-- Playlist button + popup -->
-                <Grid Grid.Column="6" Margin="4,0,0,0" VerticalAlignment="Center">
+                <Grid Grid.Row="1" Grid.Column="5" Margin="4,0,0,0" VerticalAlignment="Center">
                     <Button x:Name="PlaylistButton"
                             Content="☰"
                             Command="{Binding TogglePlaylistCommand}"
@@ -761,7 +764,7 @@
                 </Grid>
 
                 <!-- Settings button + popup -->
-                <Grid Grid.Column="7" Margin="4,0,0,0" VerticalAlignment="Center">
+                <Grid Grid.Row="1" Grid.Column="6" Margin="4,0,0,0" VerticalAlignment="Center">
                     <Button x:Name="SettingsButton"
                             Content="⚙"
                             Command="{Binding ToggleSettingsCommand}"
