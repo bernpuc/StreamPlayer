@@ -467,10 +467,10 @@ public class MainWindowViewModel : BindableBase
         CloseAcrSettingsCommand = new DelegateCommand(() => IsAcrSettingsOpen = false);
 
         TogglePlaylistCommand = new DelegateCommand(() => IsPlaylistOpen = !IsPlaylistOpen, () => HasPlaylist);
-        NextTrackCommand      = new DelegateCommand(async () => await AdvanceTrackAsync(+1),
-                                    () => CanAdvanceTrack(+1));
-        PreviousTrackCommand  = new DelegateCommand(async () => await AdvanceTrackAsync(-1),
-                                    () => CanAdvanceTrack(-1));
+        NextTrackCommand      = new DelegateCommand(async () => await AdvancePlaylistAsync(+1),
+                                    () => CanAdvancePlaylist(+1));
+        PreviousTrackCommand  = new DelegateCommand(async () => await AdvancePlaylistAsync(-1),
+                                    () => CanAdvancePlaylist(-1));
 
         SelectHistoryEntryCommand = new DelegateCommand<HistoryEntry>(async entry =>
         {
@@ -683,27 +683,22 @@ public class MainWindowViewModel : BindableBase
 
     private bool CanAdvanceTrack(int delta)
     {
-        if (HasPlaylist)
-        {
-            int next = _currentPlaylistIndex + delta;
-            return next >= 0 && next < _playlist.Count;
-        }
         if (_videoInfo?.Chapters.Count > 0)
         {
-            int idx = CurrentChapterIndex();
-            int next = idx + delta;
+            int next = CurrentChapterIndex() + delta;
             return next >= 0 && next < _videoInfo.Chapters.Count;
         }
         return false;
     }
 
+    private bool CanAdvancePlaylist(int delta)
+    {
+        int next = _currentPlaylistIndex + delta;
+        return HasPlaylist && next >= 0 && next < _playlist.Count;
+    }
+
     private async Task AdvanceTrackAsync(int delta)
     {
-        if (HasPlaylist)
-        {
-            await AdvancePlaylistAsync(delta);
-            return;
-        }
         if (_videoInfo?.Chapters.Count > 0 && _duration > 0)
         {
             int next = CurrentChapterIndex() + delta;
