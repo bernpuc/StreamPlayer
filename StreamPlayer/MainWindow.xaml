@@ -380,7 +380,7 @@
                 <!-- Current chapter name (above seek bar) -->
                 <TextBlock Grid.Row="0" Grid.Column="0" Grid.ColumnSpan="7"
                            Text="{Binding CurrentChapterTitle}"
-                           Foreground="#777" FontSize="11"
+                           Foreground="#CCCCCC" FontSize="11" FontWeight="Bold"
                            HorizontalAlignment="Center"
                            Margin="0,0,0,3"
                            MaxWidth="600" TextTrimming="CharacterEllipsis"
